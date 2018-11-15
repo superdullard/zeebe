@@ -17,6 +17,8 @@ package io.zeebe.broker.it;
 
 import static io.zeebe.test.util.TestUtil.waitUntil;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.zeebe.broker.it.clustering.ClusteringRule;
 import io.zeebe.broker.test.EmbeddedBrokerRule;
 import io.zeebe.client.ZeebeClient;
@@ -31,12 +33,14 @@ import io.zeebe.protocol.intent.DeploymentIntent;
 import io.zeebe.protocol.intent.JobIntent;
 import io.zeebe.test.util.record.RecordingExporter;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.junit.rules.ExternalResource;
 
 public class GrpcClientRule extends ExternalResource {
 
+  private final ObjectMapper mapper = new ObjectMapper();
   private final Consumer<ZeebeClientBuilder> configurator;
 
   protected ZeebeClient client;
@@ -105,6 +109,15 @@ public class GrpcClientRule extends ExternalResource {
 
   public long createSingleJob(String type, Consumer<ServiceTaskBuilder> consumer) {
     return createSingleJob(type, consumer, "{}");
+  }
+
+  public long createSingleJob(String type, Map<String, Object> payload) {
+    try {
+      final String payloadAsString = mapper.writeValueAsString(payload);
+      return createSingleJob(type, (b) -> {}, payloadAsString);
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 
   public long createSingleJob(String type, Consumer<ServiceTaskBuilder> consumer, String payload) {

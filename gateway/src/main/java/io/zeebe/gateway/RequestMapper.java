@@ -146,7 +146,8 @@ public class RequestMapper {
     return new BrokerActivateJobsRequest(grpcRequest.getType())
         .setTimeout(grpcRequest.getTimeout())
         .setWorker(grpcRequest.getWorker())
-        .setAmount(grpcRequest.getAmount());
+        .setAmount(grpcRequest.getAmount())
+        .addVariables(grpcRequest.getVariablesList());
   }
 
   public static BrokerResolveIncidentRequest toResolveIncidentRequest(

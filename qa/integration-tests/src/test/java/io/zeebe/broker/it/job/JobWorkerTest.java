@@ -31,11 +31,14 @@ import io.zeebe.exporter.record.Record;
 import io.zeebe.exporter.record.value.JobRecordValue;
 import io.zeebe.protocol.intent.JobBatchIntent;
 import io.zeebe.protocol.intent.JobIntent;
+import io.zeebe.test.util.JsonUtil;
 import io.zeebe.test.util.TestUtil;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -429,6 +432,63 @@ public class JobWorkerTest {
 
     // then
     TestUtil.waitUntil(() -> jobHandler.getHandledJobs().size() > subscriptionCapacity);
+  }
+
+  @Test
+  public void shouldFetchSelectedVariablesOnActivation() {
+    // given
+    final Map<String, Object> payload = new HashMap<>();
+    payload.put("a", 1);
+    payload.put("b", 2);
+    payload.put("c", Collections.singletonMap("x", 3));
+    clientRule.createSingleJob("foo", payload);
+
+    final RecordingJobHandler jobHandler =
+        new RecordingJobHandler((c, t) -> c.newCompleteCommand(t.getKey()).send());
+
+    // when
+    client
+        .newWorker()
+        .jobType("foo")
+        .handler(jobHandler)
+        .timeout(Duration.ofMinutes(5))
+        .name("test")
+        .variables("a", "c")
+        .open();
+
+    // then
+    waitUntil(() -> !jobHandler.getHandledJobs().isEmpty());
+
+    final ActivatedJob job = jobHandler.getHandledJobs().get(0);
+    JsonUtil.assertEquality(job.getPayload(), "{'a': 1, 'c': {'x': 3}}");
+  }
+
+  @Test
+  public void shouldFetchAllVariablesOnActivationByDefault() {
+    // given
+    final Map<String, Object> payload = new HashMap<>();
+    payload.put("a", 1);
+    payload.put("b", 2);
+    payload.put("c", Collections.singletonMap("x", 3));
+    clientRule.createSingleJob("foo", payload);
+
+    final RecordingJobHandler jobHandler =
+        new RecordingJobHandler((c, t) -> c.newCompleteCommand(t.getKey()).send());
+
+    // when
+    client
+        .newWorker()
+        .jobType("foo")
+        .handler(jobHandler)
+        .timeout(Duration.ofMinutes(5))
+        .name("test")
+        .open();
+
+    // then
+    waitUntil(() -> !jobHandler.getHandledJobs().isEmpty());
+
+    final ActivatedJob job = jobHandler.getHandledJobs().get(0);
+    JsonUtil.assertEquality(job.getPayload(), "{'a': 1, 'b': 2, 'c': {'x': 3}}");
   }
 
   private long createJobOfType(final String type) {
