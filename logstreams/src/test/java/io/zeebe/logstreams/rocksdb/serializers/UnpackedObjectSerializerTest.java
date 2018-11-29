@@ -21,7 +21,6 @@ import io.zeebe.logstreams.rocksdb.TestUnpackedObject;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
 
 public class UnpackedObjectSerializerTest {
@@ -35,7 +34,7 @@ public class UnpackedObjectSerializerTest {
     final Serializer<TestUnpackedObject> serializer = new TestUnpackedObject.Serializer();
 
     // when
-    final DirectBuffer serialized = serializer.serializeInto(original, buffer, new UnsafeBuffer());
+    final DirectBuffer serialized = serializer.serialize(original, buffer);
     final TestUnpackedObject deserialized = serializer.deserialize(serialized);
 
     // then

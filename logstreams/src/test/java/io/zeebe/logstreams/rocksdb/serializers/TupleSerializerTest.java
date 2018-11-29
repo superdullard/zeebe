@@ -22,10 +22,10 @@ import io.zeebe.util.collection.Tuple;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
 
 public class TupleSerializerTest {
+
   @Test
   public void shouldSerializeAndDeserialize() {
     // given
@@ -33,10 +33,10 @@ public class TupleSerializerTest {
     final Tuple<Long, DirectBuffer> original =
         new Tuple<>(1L, BufferUtil.wrapString("Max Mustermann"));
     final Serializer<Tuple<Long, DirectBuffer>> serializer =
-        new TupleSerializer<>(new LongSerializer(), new DirectBufferSerializer());
+        new TupleSerializer<>(Serializers.LONG, Serializers.DIRECT_BUFFER);
 
     // when
-    final DirectBuffer serialized = serializer.serializeInto(original, buffer, new UnsafeBuffer());
+    final DirectBuffer serialized = serializer.serialize(original, buffer);
     final Tuple<Long, DirectBuffer> deserialized = serializer.deserialize(serialized);
 
     // then
@@ -49,12 +49,11 @@ public class TupleSerializerTest {
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
     final Tuple<Long, DirectBuffer> data = new Tuple<>(1L, BufferUtil.wrapString("Max Mustermann"));
     final TupleSerializer<Long, DirectBuffer> serializer =
-        new TupleSerializer<>(new LongSerializer(), new DirectBufferSerializer());
+        new TupleSerializer<>(Serializers.LONG, Serializers.DIRECT_BUFFER);
 
     // when
-    final DirectBuffer serialized = serializer.serializeInto(data, buffer, 0, new UnsafeBuffer());
-    final DirectBuffer prefix =
-        serializer.serializePrefixInto(1L, buffer, serialized.capacity(), new UnsafeBuffer());
+    final DirectBuffer serialized = serializer.serialize(data, buffer, 0);
+    final DirectBuffer prefix = serializer.serializePrefix(1L, buffer, serialized.capacity());
 
     // then
     assertThat(BufferUtil.startsWith(serialized, prefix)).isTrue();

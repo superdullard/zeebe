@@ -24,29 +24,22 @@ import org.agrona.MutableDirectBuffer;
  * @param <T> serializable type
  */
 public interface Serializer<T> {
+
   int VARIABLE_LENGTH = -1;
 
-  T newInstance();
+  // Serialization
 
   int getLength();
 
-  int serialize(T value, MutableDirectBuffer dest, int offset);
+  DirectBuffer serialize(T value, MutableDirectBuffer dest, int offset);
 
-  default int serialize(T value, MutableDirectBuffer dest) {
+  default DirectBuffer serialize(T value, MutableDirectBuffer dest) {
     return serialize(value, dest, 0);
   }
 
-  default DirectBuffer serializeInto(
-      T value, MutableDirectBuffer dest, int offset, DirectBuffer view) {
-    final int length = serialize(value, dest, offset);
-    view.wrap(dest, offset, length);
+  // Deserialization
 
-    return view;
-  }
-
-  default DirectBuffer serializeInto(T value, MutableDirectBuffer dest, DirectBuffer view) {
-    return serializeInto(value, dest, 0, view);
-  }
+  T newInstance();
 
   T deserialize(DirectBuffer source, int offset, int length);
 

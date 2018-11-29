@@ -32,6 +32,7 @@ import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 
 public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoCloseable {
+
   /**
    * to extend the default options, see {@link
    * ColumnFamilyOptions#ColumnFamilyOptions(ColumnFamilyOptions)}
@@ -162,7 +163,7 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
   }
 
   public DirectBuffer serializeKey(K key) {
-    return keySerializer.serializeInto(key, keyBuffer, keyBufferView);
+    return keySerializer.serialize(key, keyBuffer);
   }
 
   public V deserializeValue(DirectBuffer source, int offset, int length) {
@@ -170,6 +171,6 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
   }
 
   public DirectBuffer serializeValue(V value) {
-    return valueSerializer.serializeInto(value, valueBuffer, valueBufferView);
+    return valueSerializer.serialize(value, valueBuffer);
   }
 }

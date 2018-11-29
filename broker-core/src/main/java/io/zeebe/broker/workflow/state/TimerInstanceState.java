@@ -29,7 +29,6 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 public class TimerInstanceState {
@@ -92,8 +91,6 @@ public class TimerInstanceState {
           EXISTENCE.length);
 
       db.getDb().write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -197,13 +194,12 @@ public class TimerInstanceState {
       batch.delete(dueDatesColumnFamily, dueDateKeyBuffer);
 
       db.getDb().write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
   @FunctionalInterface
   public interface IteratorConsumer {
+
     boolean accept(final TimerInstance timer);
   }
 }

@@ -15,14 +15,16 @@
  */
 package io.zeebe.logstreams.rocksdb.serializers;
 
-import static io.zeebe.logstreams.rocksdb.ZeebeStateConstants.STATE_BYTE_ORDER;
-
 import java.util.ArrayList;
 import java.util.List;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class ListSerializer<T> implements Serializer<List<T>> {
+public class ListSerializer<T> extends AbstractSerializer<List<T>> {
+
+  private static final PrimitiveSerializer<Integer> SIZE_SERIALIZER = Serializers.INT;
+  private static final int SIZE_SERIALIZER_LENGTH = SIZE_SERIALIZER.getLength();
+
   private final List<T> instance = new ArrayList<>(0);
   private final Serializer<T> elementSerializer;
 
@@ -41,36 +43,59 @@ public class ListSerializer<T> implements Serializer<List<T>> {
   }
 
   @Override
-  public int serialize(List<T> value, MutableDirectBuffer dest, int offset) {
-    int cursor = offset;
-    dest.putInt(cursor, value.size(), STATE_BYTE_ORDER);
-    cursor += Integer.BYTES;
+  protected int write(List<T> value, MutableDirectBuffer dest, int offset) {
+    SIZE_SERIALIZER.serialize(value.size(), dest, offset);
+    int bytesWritten = SIZE_SERIALIZER_LENGTH;
 
     for (final T element : value) {
-      final int length = elementSerializer.serialize(element, dest, cursor + Integer.BYTES);
-      dest.putInt(cursor, length, STATE_BYTE_ORDER);
-      cursor += length + Integer.BYTES;
+      bytesWritten += writeElement(dest, offset + bytesWritten, element);
     }
 
-    return cursor - offset;
+    return bytesWritten;
+  }
+
+  private int writeElement(MutableDirectBuffer dest, int offset, T element) {
+    final boolean hasVariableLength = elementSerializer.getLength() == VARIABLE_LENGTH;
+    final int bytesWritten = hasVariableLength ? SIZE_SERIALIZER_LENGTH : 0;
+    final DirectBuffer serialized =
+        elementSerializer.serialize(element, dest, offset + bytesWritten);
+
+    if (hasVariableLength) {
+      SIZE_SERIALIZER.serialize(serialized.capacity(), dest, offset);
+    }
+
+    return bytesWritten + serialized.capacity();
   }
 
   @Override
-  public List<T> deserialize(DirectBuffer source, int offset, int length) {
-    final List<T> list = newInstance();
-    final int size = source.getInt(offset, STATE_BYTE_ORDER);
-    int cursor = offset + Integer.BYTES;
+  protected List<T> read(DirectBuffer source, int offset, int length, List<T> instance) {
+    final int size = SIZE_SERIALIZER.deserialize(source, offset);
+    int bytesRead = SIZE_SERIALIZER_LENGTH;
 
     for (int i = 0; i < size; i++) {
-      final int elementLength = source.getInt(cursor, STATE_BYTE_ORDER);
-      final T element =
-          elementSerializer.deserialize(source, cursor + Integer.BYTES, elementLength);
-
-      list.add(element);
-      cursor += Integer.BYTES + elementLength;
+      bytesRead += readElement(source, instance, offset + bytesRead);
     }
 
-    assert (cursor - offset) == length : "End offset differs from length";
-    return list;
+    assert bytesRead == length : "Bytes read differs from length";
+    return instance;
+  }
+
+  private int readElement(DirectBuffer source, List<T> instance, int offset) {
+    final boolean hasVariableLength = elementSerializer.getLength() == VARIABLE_LENGTH;
+    final int bytesRead;
+    final T element;
+
+    if (hasVariableLength) {
+      final int elementLength = SIZE_SERIALIZER.deserialize(source, offset, SIZE_SERIALIZER_LENGTH);
+      element =
+          elementSerializer.deserialize(source, offset + SIZE_SERIALIZER_LENGTH, elementLength);
+      bytesRead = elementLength + SIZE_SERIALIZER_LENGTH;
+    } else {
+      element = elementSerializer.deserialize(source, offset, elementSerializer.getLength());
+      bytesRead = elementSerializer.getLength();
+    }
+
+    instance.add(element);
+    return bytesRead;
   }
 }

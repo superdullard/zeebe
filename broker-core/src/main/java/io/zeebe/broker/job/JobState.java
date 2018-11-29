@@ -38,10 +38,10 @@ import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 public class JobState implements StateLifecycleListener {
+
   private static final byte[] JOBS_COLUMN_FAMILY_NAME = getBytes("jobStateJobs");
   private static final byte[] STATES_COLUMN_FAMILY_NAME = getBytes("jobStateStates");
   private static final byte[] DEADLINES_COLUMN_FAMILY_NAME = getBytes("jobStateDeadlines");
@@ -102,8 +102,6 @@ public class JobState implements StateLifecycleListener {
       batch.put(activatableColumnFamily, keyBuffer, NULL);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -127,8 +125,6 @@ public class JobState implements StateLifecycleListener {
       batch.put(deadlinesColumnFamily, keyBuffer, NULL);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -153,8 +149,6 @@ public class JobState implements StateLifecycleListener {
       batch.delete(deadlinesColumnFamily, keyBuffer);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -178,8 +172,6 @@ public class JobState implements StateLifecycleListener {
       }
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -208,8 +200,6 @@ public class JobState implements StateLifecycleListener {
       batch.delete(deadlinesColumnFamily, keyBuffer);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -229,8 +219,6 @@ public class JobState implements StateLifecycleListener {
       batch.put(activatableColumnFamily, keyBuffer, NULL);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -377,6 +365,7 @@ public class JobState implements StateLifecycleListener {
 
   @FunctionalInterface
   public interface IteratorConsumer {
+
     void accept(long key, JobRecord record, IteratorControl control);
   }
 }

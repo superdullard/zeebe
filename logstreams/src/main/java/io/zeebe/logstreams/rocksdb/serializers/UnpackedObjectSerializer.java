@@ -19,18 +19,18 @@ import io.zeebe.msgpack.UnpackedObject;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public abstract class UnpackedObjectSerializer<T extends UnpackedObject> implements Serializer<T> {
+public abstract class UnpackedObjectSerializer<T extends UnpackedObject>
+    extends AbstractSerializer<T> {
+
   @Override
-  public int serialize(T value, MutableDirectBuffer dest, int offset) {
+  protected int write(T value, MutableDirectBuffer dest, int offset) {
     value.write(dest, offset);
     return value.getLength();
   }
 
   @Override
-  public T deserialize(DirectBuffer source, int offset, int length) {
-    final T instance = newInstance();
+  protected T read(DirectBuffer source, int offset, int length, T instance) {
     instance.wrap(source, offset, length);
-
     return instance;
   }
 
@@ -39,10 +39,10 @@ public abstract class UnpackedObjectSerializer<T extends UnpackedObject> impleme
     return VARIABLE_LENGTH;
   }
 
-  public static <R extends UnpackedObject> UnpackedObjectSerializer<R> of(R instance) {
-    return new UnpackedObjectSerializer<R>() {
+  public static <U extends UnpackedObject> UnpackedObjectSerializer<U> of(U instance) {
+    return new UnpackedObjectSerializer<U>() {
       @Override
-      public R newInstance() {
+      public U newInstance() {
         return instance;
       }
     };

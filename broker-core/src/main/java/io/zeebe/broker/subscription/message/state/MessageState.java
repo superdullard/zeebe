@@ -31,7 +31,6 @@ import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 public class MessageState implements StateLifecycleListener {
@@ -71,17 +70,20 @@ public class MessageState implements StateLifecycleListener {
   /**
    * <pre>deadline | key -> []
    *
-   * find messages which are before a given timestamp */
+   * find messages which are before a given timestamp
+   */
   private ColumnFamilyHandle deadlineColumnFamily;
   /**
    * <pre>name | correlation key | message id -> []
    *
-   * exist a message for a given message name, correlation key and message id */
+   * exist a message for a given message name, correlation key and message id
+   */
   private ColumnFamilyHandle messageIdColumnFamily;
   /**
    * <pre>key | workflow instance key -> []
    *
-   * check if a message is correlated to a workflow instance */
+   * check if a message is correlated to a workflow instance
+   */
   private ColumnFamilyHandle correlatedMessageColumnFamily;
 
   private ZbRocksDb db;
@@ -125,8 +127,6 @@ public class MessageState implements StateLifecycleListener {
       }
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -310,13 +310,12 @@ public class MessageState implements StateLifecycleListener {
           });
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
   @FunctionalInterface
   public interface MessageVisitor {
+
     boolean visit(Message message);
   }
 }

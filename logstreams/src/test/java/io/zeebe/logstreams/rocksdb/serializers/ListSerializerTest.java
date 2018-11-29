@@ -15,26 +15,61 @@
  */
 package io.zeebe.logstreams.rocksdb.serializers;
 
+import static io.zeebe.util.buffer.BufferUtil.wrapString;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-public class ListSerializerTest {
+@RunWith(Parameterized.class)
+public class ListSerializerTest<T> {
+
+  @Parameter(0)
+  public String name;
+
+  @Parameter(1)
+  public List<T> list;
+
+  @Parameter(2)
+  public ListSerializer<T> serializer;
+
+  @Parameters(name = "{0}")
+  public static Collection<Object[]> data() {
+    final List<Object[]> parameters = new ArrayList<>();
+
+    parameters.add(
+        new Object[] {
+          "fixed length items", Arrays.asList(1L, 2L, 3L), new ListSerializer<>(Serializers.LONG)
+        });
+    parameters.add(
+        new Object[] {
+          "variable length items",
+          Arrays.asList(wrapString("foo"), wrapString("bar"), wrapString("baz")),
+          new ListSerializer<>(Serializers.DIRECT_BUFFER)
+        });
+
+    return parameters;
+  }
+
   @Test
-  public void shouldSerializeAndDeserialize() {
+  public void shouldSerializeAndDeserializeList() {
     // given
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
     final List<Long> original = Arrays.asList(1L, 2L, 3L);
-    final Serializer<List<Long>> serializer = new ListSerializer<>(new LongSerializer());
+    final Serializer<List<Long>> serializer = new ListSerializer<>(Serializers.LONG);
 
     // when
-    final DirectBuffer serialized = serializer.serializeInto(original, buffer, new UnsafeBuffer());
+    final DirectBuffer serialized = serializer.serialize(original, buffer);
     final List<Long> deserialized = serializer.deserialize(serialized);
 
     // then

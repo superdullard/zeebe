@@ -18,8 +18,7 @@ package io.zeebe.logstreams.rocksdb;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
-import io.zeebe.logstreams.rocksdb.serializers.BooleanSerializer;
-import io.zeebe.logstreams.rocksdb.serializers.LongSerializer;
+import io.zeebe.logstreams.rocksdb.serializers.Serializers;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -38,6 +37,7 @@ import org.rocksdb.Options;
 import org.rocksdb.RocksDBException;
 
 public class ZbColumnTest {
+
   private ZbRocksDb db;
   private Column column;
 
@@ -158,14 +158,15 @@ public class ZbColumnTest {
   }
 
   class Column extends ZbColumn<Long, Boolean> {
-    public Column(ZbRocksDb db, ColumnFamilyHandle handle) {
+
+    Column(ZbRocksDb db, ColumnFamilyHandle handle) {
       super(
           db,
           handle,
           new UnsafeBuffer(new byte[Long.BYTES]),
-          LongSerializer.INSTANCE,
+          Serializers.LONG,
           new UnsafeBuffer(new byte[1]),
-          BooleanSerializer.INSTANCE);
+          Serializers.BOOL);
     }
   }
 }

@@ -16,10 +16,16 @@
 package io.zeebe.logstreams.rocksdb.serializers;
 
 import io.zeebe.util.collection.Tuple;
+import java.util.function.Consumer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class TupleSerializer<L, R> extends Composite implements Serializer<Tuple<L, R>> {
+public class TupleSerializer<L, R> extends AbstractSerializer<Tuple<L, R>>
+    implements PrefixSerializer<L> {
+
+  private static final PrimitiveSerializer<Integer> SIZE_SERIALIZER = Serializers.INT;
+  private static final int SIZE_SERIALIZER_LENGTH = SIZE_SERIALIZER.getLength();
+
   private final Tuple<L, R> instance = new Tuple<>();
   private final Serializer<L> leftSerializer;
   private final Serializer<R> rightSerializer;
@@ -29,15 +35,6 @@ public class TupleSerializer<L, R> extends Composite implements Serializer<Tuple
     this.rightSerializer = rightSerializer;
   }
 
-  public int serializePrefix(L left, MutableDirectBuffer dest, int offset) {
-    final int cursor = serializeMember(left, leftSerializer, dest, offset);
-    return cursor - offset;
-  }
-
-  public DirectBuffer serializePrefixInto(L left, MutableDirectBuffer dest, int offset, DirectBuffer view) {
-    return serializeMemberInto(left, leftSerializer, dest, offset, view);
-  }
-
   @Override
   public Tuple<L, R> newInstance() {
     return instance;
@@ -45,26 +42,71 @@ public class TupleSerializer<L, R> extends Composite implements Serializer<Tuple
 
   @Override
   public int getLength() {
-    return super.getLength(leftSerializer, rightSerializer);
+    final int leftLength = leftSerializer.getLength();
+    final int rightLength = rightSerializer.getLength();
+
+    if (leftLength == VARIABLE_LENGTH || rightLength == VARIABLE_LENGTH) {
+      return VARIABLE_LENGTH;
+    }
+
+    return leftLength + rightLength;
   }
 
   @Override
-  public int serialize(Tuple<L, R> value, MutableDirectBuffer dest, int offset) {
-    int cursor = serializeMember(value.getLeft(), leftSerializer, dest, offset);
-    cursor = serializeMember(value.getRight(), rightSerializer, dest, cursor);
+  protected int write(Tuple<L, R> value, MutableDirectBuffer dest, int offset) {
+    int bytesWritten = writePart(value.getLeft(), dest, offset, leftSerializer);
+    bytesWritten += writePart(value.getRight(), dest, offset + bytesWritten, rightSerializer);
 
-    assert getLength() == VARIABLE_LENGTH || (cursor - offset) == getLength()
-        : "End offset differs from expected length";
-    return cursor - offset;
+    assert getLength() == VARIABLE_LENGTH || bytesWritten == getLength()
+        : "Bytes written differs from expected length";
+    return bytesWritten;
   }
 
   @Override
-  public Tuple<L, R> deserialize(DirectBuffer source, int offset, int length) {
-    final Tuple<L, R> tuple = newInstance();
-    int cursor = deserializeMember(tuple::setLeft, leftSerializer, source, offset);
-    cursor = deserializeMember(tuple::setRight, rightSerializer, source, cursor);
+  protected Tuple<L, R> read(DirectBuffer source, int offset, int length, Tuple<L, R> instance) {
+    int bytesRead = readPart(instance::setLeft, source, offset, leftSerializer);
+    bytesRead += readPart(instance::setRight, source, offset + bytesRead, rightSerializer);
 
-    assert (cursor - offset) == length : "End offset differs from length";
-    return tuple;
+    assert bytesRead == length : "Bytes read differs from length";
+    return instance;
+  }
+
+  @Override
+  public Serializer<L> getPrefixSerializer() {
+    return leftSerializer;
+  }
+
+  private <T> int writePart(
+      T value, MutableDirectBuffer dest, int offset, Serializer<T> serializer) {
+    int bytesWritten = serializer.getLength();
+
+    if (bytesWritten != VARIABLE_LENGTH) {
+      serializer.serialize(value, dest, offset);
+    } else {
+      final DirectBuffer view = serializer.serialize(value, dest, offset + SIZE_SERIALIZER_LENGTH);
+      SIZE_SERIALIZER.serialize(view.capacity(), dest, offset);
+      bytesWritten = SIZE_SERIALIZER_LENGTH + view.capacity();
+    }
+
+    return bytesWritten;
+  }
+
+  private <T> int readPart(
+      Consumer<T> setter, DirectBuffer source, int offset, Serializer<T> serializer) {
+    final int bytesRead;
+    int length = serializer.getLength();
+
+    if (length == VARIABLE_LENGTH) {
+      length = SIZE_SERIALIZER.deserialize(source, offset, SIZE_SERIALIZER_LENGTH);
+      offset += SIZE_SERIALIZER_LENGTH;
+      bytesRead = length + SIZE_SERIALIZER_LENGTH;
+    } else {
+      bytesRead = length;
+    }
+
+    final T value = serializer.deserialize(source, offset, length);
+    setter.accept(value);
+
+    return bytesRead;
   }
 }

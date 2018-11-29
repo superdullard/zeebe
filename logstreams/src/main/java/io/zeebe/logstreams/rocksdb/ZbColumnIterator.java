@@ -19,6 +19,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class ZbColumnIterator<K, V> implements Iterator<ZbColumnEntry<K, V>> {
+
   private final ZbColumnIteratorEntry<K, V> entry;
   private final ZbColumn<K, V> column;
   private final ZbRocksIterator iterator;
@@ -61,10 +62,9 @@ public class ZbColumnIterator<K, V> implements Iterator<ZbColumnEntry<K, V>> {
     hasNext = false;
 
     if (iterator.isValid()) {
-      iterator.next();
-
       entry.set(iterator.keyBuffer(), iterator.valueBuffer());
       hasNext = true;
+      iterator.next();
     }
 
     return hasNext;

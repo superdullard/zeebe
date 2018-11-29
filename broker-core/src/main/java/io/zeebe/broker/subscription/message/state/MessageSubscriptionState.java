@@ -31,7 +31,6 @@ import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 public class MessageSubscriptionState implements StateLifecycleListener {
@@ -99,8 +98,6 @@ public class MessageSubscriptionState implements StateLifecycleListener {
           EXISTENCE.length);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -219,8 +216,6 @@ public class MessageSubscriptionState implements StateLifecycleListener {
           sentTimeColumnFamily, keyBuffer.byteArray(), keyLength, EXISTENCE, EXISTENCE.length);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -281,13 +276,12 @@ public class MessageSubscriptionState implements StateLifecycleListener {
       }
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
   @FunctionalInterface
   public interface MessageSubscriptionVisitor {
+
     boolean visit(MessageSubscription subscription);
   }
 }

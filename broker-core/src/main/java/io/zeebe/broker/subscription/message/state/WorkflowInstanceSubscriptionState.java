@@ -31,7 +31,6 @@ import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteOptions;
 
 public class WorkflowInstanceSubscriptionState implements StateLifecycleListener {
@@ -87,8 +86,6 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
           sentTimeColumnFamily, keyBuffer.byteArray(), keyLength, EXISTENCE, EXISTENCE.length);
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -199,8 +196,6 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
       }
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -228,13 +223,12 @@ public class WorkflowInstanceSubscriptionState implements StateLifecycleListener
       }
 
       db.write(options, batch);
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
   }
 
   @FunctionalInterface
   public interface WorkflowInstanceSubscriptionVisitor {
+
     boolean visit(WorkflowInstanceSubscription subscription);
   }
 }

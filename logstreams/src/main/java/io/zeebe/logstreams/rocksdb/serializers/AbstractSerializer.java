@@ -19,12 +19,16 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
-public class DirectBufferSerializer implements Serializer<DirectBuffer> {
-  private final UnsafeBuffer instance = new UnsafeBuffer(0, 0);
+public abstract class AbstractSerializer<T> implements Serializer<T> {
 
-  @Override
-  public DirectBuffer newInstance() {
-    return instance;
+  protected final DirectBuffer bufferView;
+
+  public AbstractSerializer() {
+    this(new UnsafeBuffer(0, 0));
+  }
+
+  public AbstractSerializer(DirectBuffer bufferView) {
+    this.bufferView = bufferView;
   }
 
   @Override
@@ -32,15 +36,19 @@ public class DirectBufferSerializer implements Serializer<DirectBuffer> {
     return VARIABLE_LENGTH;
   }
 
-  @Override
-  public int serialize(DirectBuffer value, MutableDirectBuffer dest, int offset) {
-    dest.putBytes(offset, value, 0, value.capacity());
-    return value.capacity();
+  public DirectBuffer serialize(T value, MutableDirectBuffer dest, int offset) {
+    final int length = write(value, dest, offset);
+    bufferView.wrap(dest, offset, length);
+    return bufferView;
   }
 
+  protected abstract int write(T value, MutableDirectBuffer dest, int offset);
+
   @Override
-  public DirectBuffer deserialize(DirectBuffer source, int offset, int length) {
-    instance.wrap(source, offset, length);
-    return instance;
+  public T deserialize(DirectBuffer source, int offset, int length) {
+    final T instance = newInstance();
+    return read(source, offset, length, instance);
   }
+
+  protected abstract T read(DirectBuffer source, int offset, int length, T instance);
 }

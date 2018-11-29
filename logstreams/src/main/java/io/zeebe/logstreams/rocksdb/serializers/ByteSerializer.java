@@ -1,21 +1,27 @@
+/*
+ * Copyright © 2017 camunda services GmbH (info@camunda.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.zeebe.logstreams.rocksdb.serializers;
 
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class ByteSerializer implements Serializer<Byte> {
-  public static final ByteSerializer INSTANCE = new ByteSerializer();
-  private static final Byte ZERO = 0;
+public class ByteSerializer extends AbstractSerializer<Byte> {
 
-  @Override
-  public int serialize(Byte value, MutableDirectBuffer dest, int offset) {
-    dest.putByte(offset, value);
-    return getLength();
-  }
-
-  @Override
-  public Byte deserialize(DirectBuffer source, int offset, int length) {
-    return source.getByte(offset);
+  public Byte newInstance() {
+    return 0;
   }
 
   @Override
@@ -24,7 +30,13 @@ public class ByteSerializer implements Serializer<Byte> {
   }
 
   @Override
-  public Byte newInstance() {
-    return ZERO;
+  protected int write(Byte value, MutableDirectBuffer dest, int offset) {
+    dest.putByte(offset, value);
+    return getLength();
+  }
+
+  @Override
+  protected Byte read(DirectBuffer source, int offset, int length, Byte instance) {
+    return source.getByte(offset);
   }
 }
