@@ -15,33 +15,31 @@
  */
 package io.zeebe.logstreams.rocksdb.serializers;
 
+import io.zeebe.logstreams.rocksdb.serializers.primitives.IntegerSerializer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class BufferSerializer<T> extends AbstractSerializer<T> {
+public abstract class BufferSerializer<T> implements Serializer<T> {
 
-  private static final PrimitiveSerializer<Integer> SIZE_SERIALIZER = Serializers.INT;
+  private static final IntegerSerializer SIZE_SERIALIZER = Serializers.INT;
   private static final int SIZE_SERIALIZER_LENGTH = SIZE_SERIALIZER.getLength();
 
-  private final Copier<T> getter;
-  private final Putter<T> putter;
-  private final Sizer<T> sizer;
   private final int length;
-  private final T instance;
 
-  public BufferSerializer(
-      Copier<T> getter, Putter<T> putter, Sizer<T> sizer, boolean hasFixedLength, T instance) {
-    this.getter = getter;
-    this.putter = putter;
-    this.sizer = sizer;
-    this.instance = instance;
-    this.length = hasFixedLength ? sizer.size(instance) : VARIABLE_LENGTH;
+  public BufferSerializer() {
+    this(VARIABLE_LENGTH);
   }
 
-  @Override
-  public T newInstance() {
-    return instance;
+  public BufferSerializer(int length) {
+    this.length = length;
   }
+
+  protected abstract void put(
+      MutableDirectBuffer dest, int offset, T value, int valueOffset, int valueLength);
+
+  protected abstract T get(DirectBuffer source, int offset, T dest, int destOffset, int length);
+
+  protected abstract int getSize(T buffer);
 
   @Override
   public int getLength() {
@@ -49,22 +47,22 @@ public class BufferSerializer<T> extends AbstractSerializer<T> {
   }
 
   @Override
-  protected int write(T value, MutableDirectBuffer dest, int offset) {
+  public int serialize(T value, MutableDirectBuffer dest, int offset) {
     int bytesWritten = 0;
     int length = getLength();
 
     if (length == VARIABLE_LENGTH) {
-      length = sizer.size(value);
+      length = getSize(value);
       SIZE_SERIALIZER.serialize(length, dest, offset);
       bytesWritten += SIZE_SERIALIZER_LENGTH;
     }
 
-    putter.put(dest, offset + bytesWritten, value, 0, length);
+    put(dest, offset + bytesWritten, value, 0, length);
     return bytesWritten + length;
   }
 
   @Override
-  protected T read(DirectBuffer source, int offset, int length, T instance) {
+  public T deserialize(DirectBuffer source, int offset, int length, T instance) {
     int bytesRead = 0;
     int serializedLength = getLength();
 
@@ -73,27 +71,9 @@ public class BufferSerializer<T> extends AbstractSerializer<T> {
       bytesRead = SIZE_SERIALIZER_LENGTH;
     }
 
-    getter.copy(source, offset + bytesRead, instance, 0, serializedLength);
+    get(source, offset + bytesRead, instance, 0, serializedLength);
 
     assert serializedLength + bytesRead == length : "Bytes read differs from expected length";
     return instance;
-  }
-
-  @FunctionalInterface
-  interface Copier<P> {
-
-    void copy(DirectBuffer source, int offset, P dest, int destOffset, int length);
-  }
-
-  @FunctionalInterface
-  interface Putter<P> {
-
-    void put(MutableDirectBuffer dest, int offset, P value, int valueOffset, int valueLength);
-  }
-
-  @FunctionalInterface
-  interface Sizer<T> {
-
-    int size(T value);
   }
 }

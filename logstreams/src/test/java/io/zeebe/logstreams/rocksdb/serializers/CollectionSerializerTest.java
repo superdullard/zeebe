@@ -18,6 +18,8 @@ package io.zeebe.logstreams.rocksdb.serializers;
 import static io.zeebe.util.buffer.BufferUtil.wrapString;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.zeebe.logstreams.rocksdb.serializers.collections.ArraySerializer;
+import io.zeebe.logstreams.rocksdb.serializers.collections.ListSerializer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,6 +27,7 @@ import java.util.List;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -32,16 +35,19 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
-public class ListSerializerTest<T> {
+public class CollectionSerializerTest<T, T_ITEM> {
 
   @Parameter(0)
   public String name;
 
   @Parameter(1)
-  public List<T> list;
+  public T collection;
 
   @Parameter(2)
-  public ListSerializer<T> serializer;
+  public T instance;
+
+  @Parameter(3)
+  public CollectionSerializer<T, T_ITEM> serializer;
 
   @Parameters(name = "{0}")
   public static Collection<Object[]> data() {
@@ -49,13 +55,40 @@ public class ListSerializerTest<T> {
 
     parameters.add(
         new Object[] {
-          "fixed length items", Arrays.asList(1L, 2L, 3L), new ListSerializer<>(Serializers.LONG)
+          "list with fixed length items",
+          Arrays.asList(1L, 2L, 3L),
+          new ArrayList<>(),
+          new ListSerializer<>(Serializers.LONG, (l, i) -> 0L)
         });
     parameters.add(
         new Object[] {
-          "variable length items",
+          "list with variable length items",
           Arrays.asList(wrapString("foo"), wrapString("bar"), wrapString("baz")),
-          new ListSerializer<>(Serializers.DIRECT_BUFFER)
+          new ArrayList<>(),
+          new ListSerializer<>(Serializers.BUFFER_WRAP, (l, i) -> new UnsafeBuffer())
+        });
+
+    parameters.add(
+        new Object[] {
+          "array with fixed length items",
+          new Long[] {1L, 2L, 3L},
+          new Long[3],
+          new ArraySerializer<>(Serializers.LONG)
+        });
+    parameters.add(
+        new Object[] {
+          "array with variable length items",
+          new DirectBuffer[] {wrapString("foo"), wrapString("bar"), wrapString("baz")},
+          new DirectBuffer[] {new UnsafeBuffer(), new UnsafeBuffer(), new UnsafeBuffer()},
+          new ArraySerializer<>(Serializers.BUFFER_WRAP)
+        });
+
+    parameters.add(
+        new Object[] {
+          "array with custom supplier",
+          new DirectBuffer[] {wrapString("foo"), wrapString("bar"), wrapString("baz")},
+          new DirectBuffer[3],
+          new ArraySerializer<>(Serializers.BUFFER_WRAP, (l, i) -> new UnsafeBuffer())
         });
 
     return parameters;
@@ -65,14 +98,12 @@ public class ListSerializerTest<T> {
   public void shouldSerializeAndDeserializeList() {
     // given
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
-    final List<Long> original = Arrays.asList(1L, 2L, 3L);
-    final Serializer<List<Long>> serializer = new ListSerializer<>(Serializers.LONG);
 
     // when
-    final DirectBuffer serialized = serializer.serialize(original, buffer);
-    final List<Long> deserialized = serializer.deserialize(serialized);
+    final int length = serializer.serialize(collection, buffer, 0);
+    final T deserialized = serializer.deserialize(buffer, 0, length, instance);
 
     // then
-    assertThat(deserialized).isEqualTo(original);
+    assertThat(deserialized).isEqualTo(collection);
   }
 }

@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.zeebe.logstreams.rocksdb.serializers;
+package io.zeebe.logstreams.rocksdb.serializers.primitives;
 
+import io.zeebe.logstreams.rocksdb.serializers.PrimitiveSerializer;
+import io.zeebe.logstreams.rocksdb.serializers.Serializers;
+import java.nio.ByteOrder;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class BooleanSerializer extends AbstractSerializer<Boolean> {
+public class BooleanSerializer extends PrimitiveSerializer<Boolean> {
 
   private static final byte FALSE = 0;
   private static final byte TRUE = 1;
 
-  @Override
-  public Boolean newInstance() {
-    return Boolean.FALSE;
+  public BooleanSerializer() {
+    super(1);
   }
 
   @Override
@@ -34,14 +36,14 @@ public class BooleanSerializer extends AbstractSerializer<Boolean> {
   }
 
   @Override
-  protected int write(Boolean value, MutableDirectBuffer dest, int offset) {
+  protected void put(MutableDirectBuffer dest, int offset, Boolean value, ByteOrder byteOrder) {
     final byte toWrite = value ? TRUE : FALSE;
-    return Serializers.BYTE.write(toWrite, dest, offset);
+    Serializers.BYTE.serialize(toWrite, dest, offset);
   }
 
   @Override
-  protected Boolean read(DirectBuffer source, int offset, int length, Boolean instance) {
-    final byte value = Serializers.BYTE.read(source, offset, length, null);
+  protected Boolean get(DirectBuffer source, int offset, ByteOrder byteOrder) {
+    final byte value = Serializers.BYTE.deserialize(source, offset, 1);
 
     switch (value) {
       case FALSE:

@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
@@ -40,7 +39,7 @@ public class PrimitiveSerializerTest<T> {
   public T value;
 
   @Parameter(2)
-  public Serializer<T> serializer;
+  public PrimitiveSerializer<T> serializer;
 
   @Parameter(3)
   public int length;
@@ -61,17 +60,8 @@ public class PrimitiveSerializerTest<T> {
           Serializers.CHAR,
           Character.BYTES
         });
-    parameters.add(new Object[] {"double", random.nextDouble(), Serializers.DOUBLE, Double.BYTES});
-    parameters.add(new Object[] {"float", random.nextFloat(), Serializers.FLOAT, Float.BYTES});
     parameters.add(new Object[] {"int", random.nextInt(), Serializers.INT, Integer.BYTES});
     parameters.add(new Object[] {"long", random.nextLong(), Serializers.LONG, Long.BYTES});
-    parameters.add(
-        new Object[] {
-          "short",
-          (short) random.nextInt(Short.MIN_VALUE, Short.MAX_VALUE),
-          Serializers.SHORT,
-          Short.BYTES
-        });
 
     return parameters;
   }
@@ -88,8 +78,8 @@ public class PrimitiveSerializerTest<T> {
     final MutableDirectBuffer buffer = new UnsafeBuffer(new byte[serializer.getLength()]);
 
     // when
-    final DirectBuffer serialized = serializer.serialize(value, buffer, 0);
-    final T deserialized = serializer.deserialize(serialized, 0, serialized.capacity());
+    final int length = serializer.serialize(value, buffer, 0);
+    final T deserialized = serializer.deserialize(buffer, 0, length);
 
     // then
     assertThat(deserialized).isEqualTo(value);

@@ -18,6 +18,7 @@ package io.zeebe.logstreams.rocksdb;
 import org.agrona.DirectBuffer;
 
 public class ZbColumnEntry<K, V> {
+
   private final ZbColumn<K, V> column;
 
   private K key;
@@ -41,10 +42,10 @@ public class ZbColumnEntry<K, V> {
   }
 
   public void setKey(DirectBuffer keyBuffer, int offset, int length) {
-    key = column.deserializeKey(keyBuffer, offset, length);
+    key = column.deserializeKey(keyBuffer, offset, length); // TODO use instance
   }
 
   public void setValue(DirectBuffer valueBuffer, int offset, int length) {
-    value = column.deserializeValue(valueBuffer, offset, length);
+    value = column.deserializeValue(valueBuffer, offset, length); // TODO use instance
   }
 }

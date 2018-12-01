@@ -24,12 +24,21 @@ public interface PrefixSerializer<T> {
 
   // Serialization
 
-  default DirectBuffer serializePrefix(T value, MutableDirectBuffer dest, int offset) {
+  default int serializePrefix(T value, MutableDirectBuffer dest, int offset) {
     return getPrefixSerializer().serialize(value, dest, offset);
   }
 
-  default DirectBuffer serializePrefix(T value, MutableDirectBuffer dest) {
+  default int serializePrefix(
+      T value, MutableDirectBuffer dest, int offset, DirectBuffer bufferView) {
+    return getPrefixSerializer().serialize(value, dest, offset, bufferView);
+  }
+
+  default int serializePrefix(T value, MutableDirectBuffer dest) {
     return serializePrefix(value, dest, 0);
+  }
+
+  default int serializePrefix(T value, MutableDirectBuffer dest, DirectBuffer bufferView) {
+    return serializePrefix(value, dest, 0, bufferView);
   }
 
   default int getPrefixLength() {
@@ -38,15 +47,15 @@ public interface PrefixSerializer<T> {
 
   // Deserialization
 
-  default T deserializePrefix(DirectBuffer source, int offset, int length) {
-    return getPrefixSerializer().deserialize(source, offset, length);
+  default T deserializePrefix(DirectBuffer source, int offset, int length, T instance) {
+    return getPrefixSerializer().deserialize(source, offset, length, instance);
   }
 
-  default T deserializePrefix(DirectBuffer source, int length) {
-    return deserializePrefix(source, 0, length);
+  default T deserializePrefix(DirectBuffer source, int length, T instance) {
+    return deserializePrefix(source, 0, length, instance);
   }
 
-  default T deserializePrefix(DirectBuffer source) {
-    return deserializePrefix(source, source.capacity());
+  default T deserializePrefix(DirectBuffer source, T instance) {
+    return deserializePrefix(source, source.capacity(), instance);
   }
 }

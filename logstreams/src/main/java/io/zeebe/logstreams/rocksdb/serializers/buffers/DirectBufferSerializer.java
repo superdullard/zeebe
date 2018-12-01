@@ -13,28 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.zeebe.logstreams.rocksdb.serializers;
+package io.zeebe.logstreams.rocksdb.serializers.buffers;
 
-import io.zeebe.msgpack.UnpackedObject;
+import io.zeebe.logstreams.rocksdb.serializers.BufferSerializer;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class UnpackedObjectSerializer<T extends UnpackedObject> implements Serializer<T> {
+public class DirectBufferSerializer extends BufferSerializer<DirectBuffer> {
 
-  @Override
-  public int serialize(T value, MutableDirectBuffer dest, int offset) {
-    value.write(dest, offset);
-    return value.getLength();
+  public DirectBufferSerializer() {}
+
+  public DirectBufferSerializer(int length) {
+    super(length);
   }
 
   @Override
-  public T deserialize(DirectBuffer source, int offset, int length, T instance) {
-    instance.wrap(source, offset, length);
-    return instance;
+  protected void put(
+      MutableDirectBuffer dest, int offset, DirectBuffer value, int valueOffset, int valueLength) {
+    dest.putBytes(offset, value, valueOffset, valueLength);
   }
 
   @Override
-  public int getLength() {
-    return VARIABLE_LENGTH;
+  protected DirectBuffer get(
+      DirectBuffer source, int offset, DirectBuffer dest, int destOffset, int length) {
+    dest.wrap(source, offset, length);
+    return dest;
+  }
+
+  @Override
+  protected int getSize(DirectBuffer buffer) {
+    return buffer.capacity();
   }
 }

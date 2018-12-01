@@ -22,6 +22,7 @@ import io.zeebe.util.collection.Tuple;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.Test;
 
 public class TupleSerializerTest {
@@ -32,12 +33,14 @@ public class TupleSerializerTest {
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
     final Tuple<Long, DirectBuffer> original =
         new Tuple<>(1L, BufferUtil.wrapString("Max Mustermann"));
+    final Tuple<Long, DirectBuffer> instance = new Tuple<>(0L, new UnsafeBuffer());
     final Serializer<Tuple<Long, DirectBuffer>> serializer =
-        new TupleSerializer<>(Serializers.LONG, Serializers.DIRECT_BUFFER);
+        new TupleSerializer<>(Serializers.LONG, Serializers.BUFFER_WRAP);
 
     // when
-    final DirectBuffer serialized = serializer.serialize(original, buffer);
-    final Tuple<Long, DirectBuffer> deserialized = serializer.deserialize(serialized);
+    final int length = serializer.serialize(original, buffer, 0);
+    final Tuple<Long, DirectBuffer> deserialized =
+        serializer.deserialize(buffer, 0, length, instance);
 
     // then
     assertThat(deserialized).isEqualToComparingOnlyGivenFields(original, "left", "right");
@@ -49,13 +52,15 @@ public class TupleSerializerTest {
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
     final Tuple<Long, DirectBuffer> data = new Tuple<>(1L, BufferUtil.wrapString("Max Mustermann"));
     final TupleSerializer<Long, DirectBuffer> serializer =
-        new TupleSerializer<>(Serializers.LONG, Serializers.DIRECT_BUFFER);
+        new TupleSerializer<>(Serializers.LONG, Serializers.BUFFER_WRAP);
 
     // when
-    final DirectBuffer serialized = serializer.serialize(data, buffer, 0);
-    final DirectBuffer prefix = serializer.serializePrefix(1L, buffer, serialized.capacity());
+    final int length = serializer.serialize(data, buffer, 0);
+    final int prefixLength = serializer.serializePrefix(1L, buffer, length);
 
     // then
-    assertThat(BufferUtil.startsWith(serialized, prefix)).isTrue();
+    final DirectBuffer bufferView = new UnsafeBuffer(buffer, 0, length);
+    final DirectBuffer prefixView = new UnsafeBuffer(buffer, length, prefixLength);
+    assertThat(BufferUtil.startsWith(bufferView, prefixView)).isTrue();
   }
 }

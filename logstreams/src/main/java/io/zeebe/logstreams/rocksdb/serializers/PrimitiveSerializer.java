@@ -25,50 +25,34 @@ import org.agrona.MutableDirectBuffer;
  * One small caveat: using these static instances means they are not thread safe, since they have
  * very minimal state: the bufferView.
  */
-public class PrimitiveSerializer<T> extends AbstractSerializer<T> {
+public abstract class PrimitiveSerializer<T> implements Serializer<T> {
 
-  private final Getter<T> getter;
-  private final Putter<T> putter;
   private final int length;
-  private final T instance;
 
-  public PrimitiveSerializer(Getter<T> getter, Putter<T> putter, int length, T instance) {
-    this.getter = getter;
-    this.putter = putter;
+  public PrimitiveSerializer(int length) {
     this.length = length;
-    this.instance = instance;
   }
 
-  @Override
-  public T newInstance() {
-    return instance;
-  }
+  protected abstract void put(MutableDirectBuffer dest, int offset, T value, ByteOrder byteOrder);
+
+  protected abstract T get(DirectBuffer source, int offset, ByteOrder byteOrder);
 
   @Override
   public int getLength() {
     return length;
   }
 
-  @Override
-  protected int write(T value, MutableDirectBuffer dest, int offset) {
-    putter.put(dest, offset, value, STATE_BYTE_ORDER);
+  public int serialize(T value, MutableDirectBuffer dest, int offset) {
+    put(dest, offset, value, STATE_BYTE_ORDER);
     return getLength();
   }
 
   @Override
-  protected T read(DirectBuffer source, int offset, int length, T instance) {
-    return getter.get(source, offset, STATE_BYTE_ORDER);
+  public T deserialize(DirectBuffer source, int offset, int length, T instance) {
+    return get(source, offset, STATE_BYTE_ORDER);
   }
 
-  @FunctionalInterface
-  interface Getter<P> {
-
-    P get(DirectBuffer source, int offset, ByteOrder byteOrder);
-  }
-
-  @FunctionalInterface
-  interface Putter<P> {
-
-    void put(MutableDirectBuffer dest, int offset, P value, ByteOrder byteOrder);
+  public T deserialize(DirectBuffer source, int offset, int length) {
+    return deserialize(source, offset, length, null);
   }
 }

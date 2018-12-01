@@ -13,28 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.zeebe.logstreams.rocksdb.serializers;
+package io.zeebe.logstreams.rocksdb.serializers.collections;
 
-import io.zeebe.msgpack.UnpackedObject;
-import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
+import io.zeebe.logstreams.rocksdb.serializers.CollectionSerializer;
+import io.zeebe.logstreams.rocksdb.serializers.Serializer;
+import java.util.List;
 
-public class UnpackedObjectSerializer<T extends UnpackedObject> implements Serializer<T> {
+public class ListSerializer<T> extends CollectionSerializer<List<T>, T> {
 
-  @Override
-  public int serialize(T value, MutableDirectBuffer dest, int offset) {
-    value.write(dest, offset);
-    return value.getLength();
+  public ListSerializer(
+      Serializer<T> itemSerializer, ItemInstanceSupplier<List<T>, T> itemSupplier) {
+    super(itemSerializer, itemSupplier);
   }
 
   @Override
-  public T deserialize(DirectBuffer source, int offset, int length, T instance) {
-    instance.wrap(source, offset, length);
-    return instance;
+  protected int getSize(List<T> list) {
+    return list.size();
   }
 
   @Override
-  public int getLength() {
-    return VARIABLE_LENGTH;
+  protected void setItem(List<T> list, int index, T item) {
+    list.add(index, item);
+  }
+
+  @Override
+  protected T getItem(List<T> list, int index) {
+    return list.get(index);
   }
 }

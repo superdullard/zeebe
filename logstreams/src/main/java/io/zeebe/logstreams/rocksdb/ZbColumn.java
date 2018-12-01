@@ -95,7 +95,7 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
       return null;
     }
 
-    return valueSerializer.deserialize(valueBuffer, bytesRead);
+    return valueSerializer.deserialize(valueBuffer, 0, bytesRead, null); // TODO use instance
   }
 
   public void delete(K key) {
@@ -159,18 +159,20 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
   }
 
   public K deserializeKey(DirectBuffer source, int offset, int length) {
-    return keySerializer.deserialize(source, offset, length);
+    return keySerializer.deserialize(source, offset, length, null); // TODO use instance
   }
 
   public DirectBuffer serializeKey(K key) {
-    return keySerializer.serialize(key, keyBuffer);
+    keySerializer.serialize(key, keyBuffer, 0, keyBufferView);
+    return keyBufferView;
   }
 
   public V deserializeValue(DirectBuffer source, int offset, int length) {
-    return valueSerializer.deserialize(source, offset, length);
+    return valueSerializer.deserialize(source, offset, length, null); // TODO use instance
   }
 
   public DirectBuffer serializeValue(V value) {
-    return valueSerializer.serialize(value, valueBuffer);
+    valueSerializer.serialize(value, valueBuffer, 0, valueBufferView);
+    return valueBufferView;
   }
 }

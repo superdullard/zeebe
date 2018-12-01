@@ -23,6 +23,7 @@ import io.zeebe.util.buffer.BufferUtil;
 import java.util.Objects;
 
 public class TestUnpackedObject extends UnpackedObject {
+
   private final LongProperty keyProperty = new LongProperty("key", -1);
   private final StringProperty nameProperty = new StringProperty("name", "");
 
@@ -69,11 +70,7 @@ public class TestUnpackedObject extends UnpackedObject {
   }
 
   public static class Serializer extends UnpackedObjectSerializer<TestUnpackedObject> {
-    private final TestUnpackedObject instance = new TestUnpackedObject();
 
-    @Override
-    public TestUnpackedObject newInstance() {
-      return instance;
-    }
+    private final TestUnpackedObject instance = new TestUnpackedObject();
   }
 }

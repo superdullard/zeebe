@@ -24,7 +24,7 @@ import org.agrona.MutableDirectBuffer;
  *
  * @param <E> enum type to serialize
  */
-public class EnumSerializer<E extends Enum<E>> extends AbstractSerializer<E> {
+public class EnumSerializer<E extends Enum<E>> implements Serializer<E> {
 
   private final E[] ordinals;
 
@@ -33,19 +33,14 @@ public class EnumSerializer<E extends Enum<E>> extends AbstractSerializer<E> {
   }
 
   @Override
-  public E newInstance() {
-    return ordinals[0];
-  }
-
-  @Override
-  protected int write(E value, MutableDirectBuffer dest, int offset) {
-    Serializers.INT.write(value.ordinal(), dest, offset);
+  public int serialize(E value, MutableDirectBuffer dest, int offset) {
+    Serializers.INT.serialize(value.ordinal(), dest, offset);
     return Serializers.INT.getLength();
   }
 
   @Override
-  protected E read(DirectBuffer source, int offset, int length, E instance) {
-    final int ordinal = Serializers.INT.read(source, offset, length, null);
+  public E deserialize(DirectBuffer source, int offset, int length, E instance) {
+    final int ordinal = Serializers.INT.deserialize(source, offset, length);
 
     assert ordinal > 0 && ordinal < ordinals.length : "Serialized enum ordinal is out of bounds";
     return ordinals[ordinal];

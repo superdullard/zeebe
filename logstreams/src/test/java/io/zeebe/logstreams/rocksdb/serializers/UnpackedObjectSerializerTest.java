@@ -18,7 +18,6 @@ package io.zeebe.logstreams.rocksdb.serializers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.zeebe.logstreams.rocksdb.TestUnpackedObject;
-import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.junit.Test;
@@ -31,11 +30,12 @@ public class UnpackedObjectSerializerTest {
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
     final TestUnpackedObject original =
         new TestUnpackedObject().setKey(3).setName("Max Mustermann");
-    final Serializer<TestUnpackedObject> serializer = new TestUnpackedObject.Serializer();
+    final Serializer<TestUnpackedObject> serializer = new UnpackedObjectSerializer<>();
 
     // when
-    final DirectBuffer serialized = serializer.serialize(original, buffer);
-    final TestUnpackedObject deserialized = serializer.deserialize(serialized);
+    final int length = serializer.serialize(original, buffer, 0);
+    final TestUnpackedObject deserialized =
+        serializer.deserialize(buffer, 0, length, new TestUnpackedObject());
 
     // then
     assertThat(deserialized).isEqualTo(original);

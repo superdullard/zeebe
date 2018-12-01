@@ -13,34 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.zeebe.logstreams.rocksdb.serializers;
+package io.zeebe.logstreams.rocksdb.serializers.primitives;
 
+import io.zeebe.logstreams.rocksdb.serializers.PrimitiveSerializer;
+import java.nio.ByteOrder;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-/**
- * Consider splitting into Serializer/Deserializer interfaces, with a Serde combined interface.
- *
- * @param <T> serializable type
- */
-public interface Serializer<T> {
+public class ByteSerializer extends PrimitiveSerializer<Byte> {
 
-  int VARIABLE_LENGTH = -1;
-
-  // Serialization
-
-  int getLength();
-
-  int serialize(T value, MutableDirectBuffer dest, int offset);
-
-  default int serialize(T value, MutableDirectBuffer dest, int offset, DirectBuffer bufferView) {
-    final int length = serialize(value, dest, offset);
-    bufferView.wrap(dest, offset, length);
-
-    return length;
+  public ByteSerializer() {
+    super(1);
   }
 
-  // Deserialization
+  @Override
+  protected void put(MutableDirectBuffer dest, int offset, Byte value, ByteOrder byteOrder) {
+    dest.putByte(offset, value);
+  }
 
-  T deserialize(DirectBuffer source, int offset, int length, T instance);
+  @Override
+  protected Byte get(DirectBuffer source, int offset, ByteOrder byteOrder) {
+    return source.getByte(offset);
+  }
 }

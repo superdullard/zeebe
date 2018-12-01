@@ -18,11 +18,11 @@ package io.zeebe.logstreams.rocksdb.serializers;
 import static io.zeebe.util.buffer.BufferUtil.wrapString;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.ByteBuffer;
+import io.zeebe.logstreams.rocksdb.serializers.buffers.ByteArraySerializer;
+import io.zeebe.logstreams.rocksdb.serializers.buffers.MutableDirectBufferSerializer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -42,9 +42,12 @@ public class BufferSerializerTest<T> {
   public T value;
 
   @Parameter(2)
-  public BufferSerializer<T> serializer;
+  public T instance;
 
   @Parameter(3)
+  public BufferSerializer<T> serializer;
+
+  @Parameter(4)
   public int length;
 
   @Parameters(name = "{0}")
@@ -53,17 +56,11 @@ public class BufferSerializerTest<T> {
 
     parameters.add(
         new Object[] {
-          "direct buffer", wrapString("foo"), Serializers.DIRECT_BUFFER, Serializer.VARIABLE_LENGTH
-        });
-
-    final ByteBuffer byteBufferValue = ByteBuffer.wrap("foo".getBytes());
-    final ByteBuffer byteBufferInstance = ByteBuffer.allocate(byteBufferValue.limit());
-    parameters.add(
-        new Object[] {
-          "byte buffer",
-          byteBufferValue,
-          Serializers.newByteBuffer(byteBufferInstance),
-          byteBufferInstance.limit()
+          "direct buffer",
+          wrapString("foo"),
+          new UnsafeBuffer(),
+          Serializers.BUFFER_WRAP,
+          Serializer.VARIABLE_LENGTH
         });
 
     final byte[] byteArrayValue = "foo".getBytes();
@@ -72,7 +69,8 @@ public class BufferSerializerTest<T> {
         new Object[] {
           "byte array",
           byteArrayValue,
-          Serializers.newByteArray(byteArrayInstance),
+          byteArrayInstance,
+          new ByteArraySerializer(byteArrayInstance.length),
           byteArrayInstance.length
         });
 
@@ -83,7 +81,8 @@ public class BufferSerializerTest<T> {
         new Object[] {
           "fixed unsafe buffer",
           fixedUnsafeBufferValue,
-          Serializers.newMutableBuffer(fixedUnsafeBufferInstance),
+          fixedUnsafeBufferInstance,
+          new MutableDirectBufferSerializer(fixedUnsafeBufferInstance.capacity()),
           fixedUnsafeBufferInstance.capacity()
         });
 
@@ -95,7 +94,8 @@ public class BufferSerializerTest<T> {
         new Object[] {
           "expandable array buffer",
           expandableArrayBufferValue,
-          Serializers.newMutableBuffer(expandableArrayBuffer),
+          expandableArrayBuffer,
+          new MutableDirectBufferSerializer(),
           Serializer.VARIABLE_LENGTH
         });
 
@@ -114,8 +114,8 @@ public class BufferSerializerTest<T> {
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
 
     // when
-    final DirectBuffer serialized = serializer.serialize(value, buffer, 0);
-    final T deserialized = serializer.deserialize(serialized, 0, serialized.capacity());
+    final int length = serializer.serialize(value, buffer, 0);
+    final T deserialized = serializer.deserialize(buffer, 0, length, instance);
 
     // then
     assertThat(deserialized).isEqualTo(value);
