@@ -20,18 +20,17 @@ import java.util.NoSuchElementException;
 
 public class ZbColumnIterator<K, V> implements Iterator<ZbColumnEntry<K, V>> {
 
-  private final ZbColumnIteratorEntry<K, V> entry;
-  private final ZbColumn<K, V> column;
-  private final ZbRocksIterator iterator;
+  private final ZbColumnEntry<K, V> entry;
 
+  private ZbRocksIterator rocksIterator;
   private boolean hasNext;
 
-  public ZbColumnIterator(ZbColumn<K, V> column, ZbRocksIterator iterator) {
-    assert iterator.isValid() : "iterator is useless unless valid";
+  public ZbColumnIterator(ZbColumnEntry<K, V> entry) {
+    this.entry = entry;
+  }
 
-    this.column = column;
-    this.iterator = iterator;
-    this.entry = new ZbColumnIteratorEntry<>(column);
+  public void reset(ZbRocksIterator rocksIterator) {
+    this.rocksIterator = rocksIterator;
   }
 
   @Override
@@ -49,22 +48,16 @@ public class ZbColumnIterator<K, V> implements Iterator<ZbColumnEntry<K, V>> {
     throw new NoSuchElementException();
   }
 
-  @Override
-  public void remove() {
-    if (!hasNext) {
-      throw new IllegalStateException();
-    }
-
-    column.delete(entry);
-  }
-
   protected boolean seekNextEntry() {
-    hasNext = false;
+    assert rocksIterator != null : "no rocks iterator given";
 
-    if (iterator.isValid()) {
-      entry.set(iterator.keyBuffer(), iterator.valueBuffer());
+    hasNext = false;
+    entry.reset();
+
+    if (rocksIterator.isValid()) {
+      entry.set(rocksIterator.keyBuffer(), rocksIterator.valueBuffer());
       hasNext = true;
-      iterator.next();
+      rocksIterator.next();
     }
 
     return hasNext;

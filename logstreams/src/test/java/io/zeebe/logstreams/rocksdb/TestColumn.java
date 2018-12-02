@@ -19,15 +19,16 @@ import io.zeebe.logstreams.rocksdb.serializers.Serializer;
 import io.zeebe.logstreams.rocksdb.serializers.TupleSerializer;
 import io.zeebe.util.collection.Tuple;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ReadOptions;
 
 public class TestColumn extends ZbColumn<Tuple<Long, Integer>, TestUnpackedObject> {
   public static final byte[] NAME = "test".getBytes();
 
-  private final MutableDirectBuffer prefixBuffer = new UnsafeBuffer(new byte[Long.BYTES]);
+  private final TestUnpackedObject valueInstance = new TestUnpackedObject();
   private final TupleSerializer<Long, Integer> keySerializer;
+  private final MutableDirectBuffer keyBuffer;
+  private final Serializer<TestUnpackedObject> valueSerializer;
+  private final MutableDirectBuffer valueBuffer;
 
   public TestColumn(
       ZbRocksDb db,
@@ -36,18 +37,35 @@ public class TestColumn extends ZbColumn<Tuple<Long, Integer>, TestUnpackedObjec
       TupleSerializer<Long, Integer> keySerializer,
       MutableDirectBuffer valueBuffer,
       Serializer<TestUnpackedObject> valueSerializer) {
-    super(db, columnFamilyHandle, keyBuffer, keySerializer, valueBuffer, valueSerializer);
+    super(db, columnFamilyHandle);
     this.keySerializer = keySerializer;
+    this.keyBuffer = keyBuffer;
+    this.valueSerializer = valueSerializer;
+    this.valueBuffer = valueBuffer;
   }
 
-  public void forEachWithPrefix(long prefix, Visitor visitor) {
-    keySerializer.serializePrefix(prefix, prefixBuffer, 0);
-    try (final ReadOptions options = new ReadOptions();
-        final ZbRocksIterator rocksIterator = newIterator(options)) {}
+  @Override
+  protected TupleSerializer<Long, Integer> getKeySerializer() {
+    return keySerializer;
   }
 
-  @FunctionalInterface
-  public interface Visitor {
-    void visit(Tuple<Long, Integer> key, TestUnpackedObject value);
+  @Override
+  protected MutableDirectBuffer getKeyBuffer() {
+    return keyBuffer;
+  }
+
+  @Override
+  protected Serializer<TestUnpackedObject> getValueSerializer() {
+    return valueSerializer;
+  }
+
+  @Override
+  protected MutableDirectBuffer getValueBuffer() {
+    return valueBuffer;
+  }
+
+  @Override
+  protected TestUnpackedObject getValueInstance() {
+    return valueInstance;
   }
 }

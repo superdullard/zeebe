@@ -15,7 +15,7 @@
  */
 package io.zeebe.logstreams.rocksdb;
 
-import io.zeebe.logstreams.rocksdb.serializers.UnpackedObjectSerializer;
+import io.zeebe.logstreams.rocksdb.serializers.BufferReaderWriter;
 import io.zeebe.msgpack.UnpackedObject;
 import io.zeebe.msgpack.property.LongProperty;
 import io.zeebe.msgpack.property.StringProperty;
@@ -69,7 +69,7 @@ public class TestUnpackedObject extends UnpackedObject {
     return Objects.hash(getKey(), getName());
   }
 
-  public static class Serializer extends UnpackedObjectSerializer<TestUnpackedObject> {
+  public static class Serializer extends BufferReaderWriter<TestUnpackedObject> {
 
     private final TestUnpackedObject instance = new TestUnpackedObject();
   }

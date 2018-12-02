@@ -17,27 +17,30 @@ package io.zeebe.logstreams.rocksdb.serializers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.logstreams.rocksdb.TestUnpackedObject;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.junit.Test;
 
-public class UnpackedObjectSerializerTest {
+public class EnumSerializerTest {
+
+  public enum Enum {
+    A,
+    B,
+    C
+  }
 
   @Test
   public void shouldSerializeAndDeserialize() {
     // given
     final MutableDirectBuffer buffer = new ExpandableArrayBuffer();
-    final TestUnpackedObject original =
-        new TestUnpackedObject().setKey(3).setName("Max Mustermann");
-    final Serializer<TestUnpackedObject> serializer = new UnpackedObjectSerializer<>();
+    final EnumSerializer<Enum> serializer = EnumSerializer.of(Enum.class);
 
-    // when
-    final int length = serializer.serialize(original, buffer, 0);
-    final TestUnpackedObject deserialized =
-        serializer.deserialize(buffer, 0, length, new TestUnpackedObject());
+    for (final Enum value : Enum.values()) {
+      // when
+      final int length = serializer.serialize(value, buffer, 0);
 
-    // then
-    assertThat(deserialized).isEqualTo(original);
+      // then
+      assertThat(serializer.deserialize(buffer, 0, length)).isEqualTo(value);
+    }
   }
 }

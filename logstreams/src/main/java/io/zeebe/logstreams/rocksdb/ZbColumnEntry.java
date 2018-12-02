@@ -15,37 +15,84 @@
  */
 package io.zeebe.logstreams.rocksdb;
 
+import io.zeebe.logstreams.rocksdb.serializers.Serializer;
+import io.zeebe.util.collection.Reusable;
 import org.agrona.DirectBuffer;
 
-public class ZbColumnEntry<K, V> {
+public class ZbColumnEntry<K, V> implements Reusable {
 
-  private final ZbColumn<K, V> column;
-
+  private final Serializer<K> keySerializer;
+  private DirectBuffer keyBuffer;
   private K key;
+  private boolean isKeySet;
+
+  private final Serializer<V> valueSerializer;
+  private DirectBuffer valueBuffer;
   private V value;
+  private boolean isValueSet;
 
-  public ZbColumnEntry(ZbColumn<K, V> column) {
-    this.column = column;
+  private boolean isSet;
+
+  public ZbColumnEntry(Serializer<K> keySerializer, Serializer<V> valueSerializer) {
+    this.keySerializer = keySerializer;
+    this.valueSerializer = valueSerializer;
   }
 
-  public K getKey() {
-    return key;
+  public ZbColumnEntry(Serializer<K> keySerializer, K key, Serializer<V> valueSerializer) {
+    this(keySerializer, valueSerializer);
+    this.key = key;
   }
 
-  public V getValue() {
-    return value;
+  public ZbColumnEntry(Serializer<K> keySerializer, Serializer<V> valueSerializer, V value) {
+    this(keySerializer, valueSerializer);
+    this.value = value;
   }
 
-  public void set(K key, V value) {
+  public ZbColumnEntry(Serializer<K> keySerializer, K key, Serializer<V> valueSerializer, V value) {
+    this(keySerializer, valueSerializer);
     this.key = key;
     this.value = value;
   }
 
-  public void setKey(DirectBuffer keyBuffer, int offset, int length) {
-    key = column.deserializeKey(keyBuffer, offset, length); // TODO use instance
+  public boolean isSet() {
+    return isSet;
   }
 
-  public void setValue(DirectBuffer valueBuffer, int offset, int length) {
-    value = column.deserializeValue(valueBuffer, offset, length); // TODO use instance
+  @Override
+  public void reset() {
+    isSet = false;
+    isKeySet = false;
+    isValueSet = false;
+  }
+
+  public K getKey() {
+    if (isKeySet) {
+      return key;
+    }
+
+    isKeySet = true;
+    return lazyGet(keyBuffer, keySerializer, key);
+  }
+
+  public V getValue() {
+    if (isValueSet) {
+      return value;
+    }
+
+    isValueSet = true;
+    return lazyGet(valueBuffer, valueSerializer, value);
+  }
+
+  public void set(DirectBuffer keyBuffer, DirectBuffer valueBuffer) {
+    isSet = true;
+    this.keyBuffer = keyBuffer;
+    this.valueBuffer = valueBuffer;
+  }
+
+  private <T> T lazyGet(DirectBuffer source, Serializer<T> serializer, T instance) {
+    assert isSet() : "entry is not set, cannot deserialize anything";
+    instance = serializer.deserialize(source, 0, source.capacity(), instance);
+
+    return instance;
   }
 }

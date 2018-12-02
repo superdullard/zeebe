@@ -17,6 +17,7 @@ package io.zeebe.logstreams.rocksdb;
 
 import static io.zeebe.util.ByteArrayUtil.concat;
 
+import io.zeebe.logstreams.rocksdb.serializers.BufferReaderWriter;
 import io.zeebe.logstreams.rocksdb.serializers.Serializers;
 import io.zeebe.logstreams.rocksdb.serializers.TupleSerializer;
 import java.util.Collections;
@@ -34,7 +35,7 @@ public class TestState extends ZbState {
       new UnsafeBuffer(new byte[Long.BYTES + Integer.BYTES]);
 
   private final ExpandableArrayBuffer valueBuffer = new ExpandableArrayBuffer();
-  private final TestUnpackedObject.Serializer valueSerializer = new TestUnpackedObject.Serializer();
+  private final BufferReaderWriter<TestUnpackedObject> valueSerializer = new BufferReaderWriter<>();
 
   private final TestColumn testColumn;
 

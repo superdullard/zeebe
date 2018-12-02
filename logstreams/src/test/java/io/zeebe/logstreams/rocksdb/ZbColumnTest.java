@@ -18,6 +18,7 @@ package io.zeebe.logstreams.rocksdb;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
+import io.zeebe.logstreams.rocksdb.serializers.Serializer;
 import io.zeebe.logstreams.rocksdb.serializers.Serializers;
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.After;
 import org.junit.Before;
@@ -62,7 +64,7 @@ public class ZbColumnTest {
     final DirectBuffer serialized = column.serializeKey(1L);
 
     // when
-    final long key = column.deserializeKey(serialized, 0, Long.BYTES);
+    final long key = column.deserializeKey(serialized, 0, Long.BYTES, null);
 
     // then
     assertThat(key).isEqualTo(1L);
@@ -74,7 +76,7 @@ public class ZbColumnTest {
     final DirectBuffer serialized = column.serializeValue(false);
 
     // when
-    final boolean value = column.deserializeValue(serialized, 0, Long.BYTES);
+    final boolean value = column.deserializeValue(serialized, 0, Long.BYTES, null);
 
     // then
     assertThat(value).isEqualTo(false);
@@ -149,24 +151,65 @@ public class ZbColumnTest {
 
     // when
     column.put(data);
-    for (final ZbColumnEntry<Long, Boolean> entry : column) {
-      collected.put(entry.getKey(), entry.getValue());
+    try (final ZbRocksIterator rocksIterator = column.newRocksIterator()) {
+      rocksIterator.seekToFirst();
+      column.iterator().reset(rocksIterator);
+
+      for (final ZbColumnEntry<Long, Boolean> entry : column) {
+        collected.put(entry.getKey(), entry.getValue());
+      }
     }
 
     // then
     assertThat(collected).containsExactly(entry(1L, false), entry(2L, true), entry(3L, false));
   }
 
-  class Column extends ZbColumn<Long, Boolean> {
+  class Column extends ZbColumn<Long, Boolean> implements Iterable<ZbColumnEntry<Long, Boolean>> {
+
+    private final UnsafeBuffer keyBuffer = new UnsafeBuffer(new byte[Long.BYTES]);
+    private final UnsafeBuffer valueBuffer = new UnsafeBuffer(new byte[1]);
+
+    private final Iterator iterator = new Iterator();
 
     Column(ZbRocksDb db, ColumnFamilyHandle handle) {
-      super(
-          db,
-          handle,
-          new UnsafeBuffer(new byte[Long.BYTES]),
-          Serializers.LONG,
-          new UnsafeBuffer(new byte[1]),
-          Serializers.BOOL);
+      super(db, handle);
+    }
+
+    @Override
+    protected Serializer<Long> getKeySerializer() {
+      return Serializers.LONG;
+    }
+
+    @Override
+    protected MutableDirectBuffer getKeyBuffer() {
+      return keyBuffer;
+    }
+
+    @Override
+    protected Serializer<Boolean> getValueSerializer() {
+      return Serializers.BOOL;
+    }
+
+    @Override
+    protected MutableDirectBuffer getValueBuffer() {
+      return valueBuffer;
+    }
+
+    @Override
+    protected Boolean getValueInstance() {
+      return Boolean.FALSE;
+    }
+
+    @Override
+    public Iterator iterator() {
+      return iterator;
+    }
+
+    final class Iterator extends ZbColumnIterator<Long, Boolean> {
+
+      private Iterator() {
+        super(new ZbColumnEntry<>(getKeySerializer(), getValueSerializer()));
+      }
     }
   }
 }

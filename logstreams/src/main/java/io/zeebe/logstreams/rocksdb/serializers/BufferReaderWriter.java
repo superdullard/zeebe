@@ -15,11 +15,12 @@
  */
 package io.zeebe.logstreams.rocksdb.serializers;
 
-import io.zeebe.msgpack.UnpackedObject;
+import io.zeebe.util.buffer.BufferReader;
+import io.zeebe.util.buffer.BufferWriter;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public class UnpackedObjectSerializer<T extends UnpackedObject> implements Serializer<T> {
+public class BufferReaderWriter<T extends BufferReader & BufferWriter> implements Serializer<T> {
 
   @Override
   public int serialize(T value, MutableDirectBuffer dest, int offset) {

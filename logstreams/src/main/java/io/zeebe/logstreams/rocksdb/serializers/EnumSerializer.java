@@ -28,8 +28,8 @@ public class EnumSerializer<E extends Enum<E>> implements Serializer<E> {
 
   private final E[] ordinals;
 
-  public EnumSerializer(Class<E> enumClass) {
-    this.ordinals = enumClass.getEnumConstants();
+  public EnumSerializer(E[] ordinals) {
+    this.ordinals = ordinals;
   }
 
   @Override
@@ -42,12 +42,25 @@ public class EnumSerializer<E extends Enum<E>> implements Serializer<E> {
   public E deserialize(DirectBuffer source, int offset, int length, E instance) {
     final int ordinal = Serializers.INT.deserialize(source, offset, length);
 
-    assert ordinal > 0 && ordinal < ordinals.length : "Serialized enum ordinal is out of bounds";
+    assert ordinal >= 0 && ordinal < ordinals.length : "Serialized enum ordinal is out of bounds";
     return ordinals[ordinal];
+  }
+
+  public E deserialize(DirectBuffer source, int offset, int length) {
+    return deserialize(source, offset, length, null);
   }
 
   @Override
   public int getLength() {
     return Serializers.INT.getLength();
+  }
+
+  public static <E extends Enum<E>> EnumSerializer<E> of(Class<E> enumClass) {
+    return new EnumSerializer<E>(enumClass.getEnumConstants());
+  }
+
+  @SafeVarargs
+  public static <E extends Enum<E>> EnumSerializer<E> of(E... ordinals) {
+    return new EnumSerializer<E>(ordinals);
   }
 }

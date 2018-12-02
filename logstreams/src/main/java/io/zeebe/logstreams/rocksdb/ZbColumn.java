@@ -16,13 +16,8 @@
 package io.zeebe.logstreams.rocksdb;
 
 import io.zeebe.logstreams.rocksdb.serializers.Serializer;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Spliterator;
-import java.util.Spliterators;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -31,7 +26,7 @@ import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 
-public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoCloseable {
+public abstract class ZbColumn<K, V> implements AutoCloseable {
 
   /**
    * to extend the default options, see {@link
@@ -40,31 +35,31 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
   public static final ColumnFamilyOptions DEFAULT_OPTIONS =
       new ColumnFamilyOptions().optimizeUniversalStyleCompaction();
 
+  protected final DirectBuffer keyBufferView = new UnsafeBuffer();
+  protected final DirectBuffer valueBufferView = new UnsafeBuffer();
+
   protected final ZbRocksDb db;
   protected final ColumnFamilyHandle handle;
 
-  protected final Serializer<K> keySerializer;
-  protected final MutableDirectBuffer keyBuffer;
-  protected final DirectBuffer keyBufferView = new UnsafeBuffer(0, 0);
-
-  protected final Serializer<V> valueSerializer;
-  protected final MutableDirectBuffer valueBuffer;
-  protected final DirectBuffer valueBufferView = new UnsafeBuffer(0, 0);
-
-  public ZbColumn(
-      ZbRocksDb db,
-      ColumnFamilyHandle handle,
-      MutableDirectBuffer keyBuffer,
-      Serializer<K> keySerializer,
-      MutableDirectBuffer valueBuffer,
-      Serializer<V> valueSerializer) {
+  public ZbColumn(ZbRocksDb db, ColumnFamilyHandle handle) {
     this.db = db;
     this.handle = handle;
-    this.keyBuffer = keyBuffer;
-    this.keySerializer = keySerializer;
-    this.valueBuffer = valueBuffer;
-    this.valueSerializer = valueSerializer;
   }
+
+  @Override
+  public void close() {
+    handle.close();
+  }
+
+  protected abstract Serializer<K> getKeySerializer();
+
+  protected abstract MutableDirectBuffer getKeyBuffer();
+
+  protected abstract Serializer<V> getValueSerializer();
+
+  protected abstract MutableDirectBuffer getValueBuffer();
+
+  protected abstract V getValueInstance();
 
   public void put(K key, V value) {
     db.put(handle, serializeKey(key), serializeValue(value));
@@ -89,13 +84,14 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
   }
 
   public V get(K key) {
+    final MutableDirectBuffer valueBuffer = getValueBuffer();
     final int bytesRead = db.get(handle, serializeKey(key), valueBuffer);
 
     if (bytesRead == RocksDB.NOT_FOUND) {
       return null;
     }
 
-    return valueSerializer.deserialize(valueBuffer, 0, bytesRead, null); // TODO use instance
+    return deserializeValue(valueBuffer, 0, bytesRead, getValueInstance());
   }
 
   public void delete(K key) {
@@ -110,69 +106,43 @@ public class ZbColumn<K, V> implements Iterable<ZbColumnEntry<K, V>>, AutoClosea
    * Exists primarily for deleting while iterating, since we already have a pre-serialized keyBuffer
    * and don't need to serialize it again
    *
-   * @param entry iterator entry to remove
+   * @param key pre-serialized key
    */
-  void delete(ZbColumnIteratorEntry entry) {
-    db.delete(handle, entry.getKeyBuffer());
+  void delete(DirectBuffer key) {
+    db.delete(handle, key);
   }
 
   public boolean exists(K key) {
     return db.exists(handle, serializeKey(key));
   }
 
-  /** NOTE: does not close the RocksIterator once finished. */
-  @Override
-  public Iterator<ZbColumnEntry<K, V>> iterator() {
-    final ZbRocksIterator rocksIterator = db.newIterator(handle);
-    rocksIterator.seekToFirst();
+  // Iteration
 
-    return new ZbColumnIterator<>(this, rocksIterator);
-  }
-
-  public Iterator<ZbColumnEntry<K, V>> iterator(ZbRocksIterator iterator) {
-    return new ZbColumnIterator<>(this, iterator);
-  }
-
-  @Override
-  public Spliterator<ZbColumnEntry<K, V>> spliterator() {
-    return Spliterators.spliterator(
-        iterator(),
-        db.getEstimatedNumberOfKeys(handle),
-        Spliterator.SORTED | Spliterator.NONNULL | Spliterator.DISTINCT);
-  }
-
-  public Stream<ZbColumnEntry<K, V>> stream() {
-    return StreamSupport.stream(spliterator(), false);
-  }
-
-  public ZbRocksIterator newIterator() {
+  public ZbRocksIterator newRocksIterator() {
     return db.newIterator(handle);
   }
 
-  public ZbRocksIterator newIterator(ReadOptions options) {
+  public ZbRocksIterator newRocksIterator(ReadOptions options) {
     return db.newIterator(handle, options);
   }
 
-  @Override
-  public void close() {
-    handle.close();
-  }
+  // Serialization/deserialization utilities
 
-  public K deserializeKey(DirectBuffer source, int offset, int length) {
-    return keySerializer.deserialize(source, offset, length, null); // TODO use instance
+  public K deserializeKey(DirectBuffer source, int offset, int length, K instance) {
+    return getKeySerializer().deserialize(source, offset, length, instance);
   }
 
   public DirectBuffer serializeKey(K key) {
-    keySerializer.serialize(key, keyBuffer, 0, keyBufferView);
+    getKeySerializer().serialize(key, getKeyBuffer(), 0, keyBufferView);
     return keyBufferView;
   }
 
-  public V deserializeValue(DirectBuffer source, int offset, int length) {
-    return valueSerializer.deserialize(source, offset, length, null); // TODO use instance
+  public V deserializeValue(DirectBuffer source, int offset, int length, V instance) {
+    return getValueSerializer().deserialize(source, offset, length, instance);
   }
 
   public DirectBuffer serializeValue(V value) {
-    valueSerializer.serialize(value, valueBuffer, 0, valueBufferView);
+    getValueSerializer().serialize(value, getValueBuffer(), 0, valueBufferView);
     return valueBufferView;
   }
 }
