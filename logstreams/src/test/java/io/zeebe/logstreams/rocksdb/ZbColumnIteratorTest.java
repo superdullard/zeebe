@@ -15,4 +15,13 @@
  */
 package io.zeebe.logstreams.rocksdb;
 
-public class ZbColumnIteratorTest {}
+import static org.mockito.Mockito.mock;
+
+import org.agrona.DirectBuffer;
+
+public class ZbColumnIteratorTest {
+
+  @SuppressWarnings("unchecked")
+  private final ZbColumnEntry<DirectBuffer, DirectBuffer> entry =
+      (ZbColumnEntry<DirectBuffer, DirectBuffer>) mock(ZbColumnEntry.class);
+}

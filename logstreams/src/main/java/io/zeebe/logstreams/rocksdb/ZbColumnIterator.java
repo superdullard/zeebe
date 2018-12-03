@@ -15,6 +15,7 @@
  */
 package io.zeebe.logstreams.rocksdb;
 
+import io.zeebe.logstreams.rocksdb.serializers.Serializer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -61,5 +62,14 @@ public class ZbColumnIterator<K, V> implements Iterator<ZbColumnEntry<K, V>> {
     }
 
     return hasNext;
+  }
+
+  /**
+   * Primarily used when iterating over primitives, where you don't need to supply a pre-allocated
+   * instance.
+   */
+  public static <K, V> ZbColumnIterator<K, V> of(
+      Serializer<K> keySerializer, Serializer<V> valueSerializer) {
+    return new ZbColumnIterator<>(new ZbColumnEntry<>(keySerializer, valueSerializer));
   }
 }

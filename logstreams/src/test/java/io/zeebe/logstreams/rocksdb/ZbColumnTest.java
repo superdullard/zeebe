@@ -153,9 +153,10 @@ public class ZbColumnTest {
     column.put(data);
     try (final ZbRocksIterator rocksIterator = column.newRocksIterator()) {
       rocksIterator.seekToFirst();
-      column.iterator().reset(rocksIterator);
+      column.iterator.reset(rocksIterator);
 
-      for (final ZbColumnEntry<Long, Boolean> entry : column) {
+      while (column.iterator.hasNext()) {
+        final ZbColumnEntry<Long, Boolean> entry = column.iterator.next();
         collected.put(entry.getKey(), entry.getValue());
       }
     }
@@ -164,12 +165,13 @@ public class ZbColumnTest {
     assertThat(collected).containsExactly(entry(1L, false), entry(2L, true), entry(3L, false));
   }
 
-  class Column extends ZbColumn<Long, Boolean> implements Iterable<ZbColumnEntry<Long, Boolean>> {
+  private static class Column extends ZbColumn<Long, Boolean> {
 
     private final UnsafeBuffer keyBuffer = new UnsafeBuffer(new byte[Long.BYTES]);
     private final UnsafeBuffer valueBuffer = new UnsafeBuffer(new byte[1]);
 
-    private final Iterator iterator = new Iterator();
+    private final ZbColumnIterator<Long, Boolean> iterator =
+        ZbColumnIterator.of(getKeySerializer(), getValueSerializer());
 
     Column(ZbRocksDb db, ColumnFamilyHandle handle) {
       super(db, handle);
@@ -198,18 +200,6 @@ public class ZbColumnTest {
     @Override
     protected Boolean getValueInstance() {
       return Boolean.FALSE;
-    }
-
-    @Override
-    public Iterator iterator() {
-      return iterator;
-    }
-
-    final class Iterator extends ZbColumnIterator<Long, Boolean> {
-
-      private Iterator() {
-        super(new ZbColumnEntry<>(getKeySerializer(), getValueSerializer()));
-      }
     }
   }
 }
