@@ -15,29 +15,17 @@
  */
 package io.zeebe.exporter;
 
-import static io.zeebe.test.util.record.RecordingExporter.workflowInstanceRecords;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 import com.carrotsearch.hppc.cursors.ObjectCursor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.zeebe.broker.system.configuration.ExporterCfg;
-import io.zeebe.client.ZeebeClient;
 import io.zeebe.exporter.record.Record;
-import io.zeebe.exporter.record.value.IncidentRecordValue;
-import io.zeebe.model.bpmn.Bpmn;
-import io.zeebe.model.bpmn.BpmnModelInstance;
-import io.zeebe.protocol.intent.IncidentIntent;
-import io.zeebe.protocol.intent.WorkflowInstanceIntent;
-import io.zeebe.test.ZeebeTestRule;
-import io.zeebe.test.util.TestUtil;
-import io.zeebe.test.util.record.RecordingExporter;
+import io.zeebe.test.exporter.ExporterIntegrationRule;
 import io.zeebe.util.ZbLogger;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
@@ -45,7 +33,6 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.settings.Settings;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -54,102 +41,36 @@ public class ElasticsearchExporterIT {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  @Rule public ZeebeTestRule testRule = new ZeebeTestRule();
+  @Rule public ExporterIntegrationRule exporterBrokerRule = new ExporterIntegrationRule();
 
-  public static final BpmnModelInstance WORKFLOW =
-      Bpmn.createExecutableProcess("testProcess")
-          .startEvent()
-          .intermediateCatchEvent(
-              "message", e -> e.message(m -> m.name("catch").zeebeCorrelationKey("$.orderId")))
-          .serviceTask("task", t -> t.zeebeTaskType("work").zeebeTaskHeader("foo", "bar"))
-          .endEvent()
-          .done();
-
-  public static final BpmnModelInstance SECOND_WORKFLOW =
-      Bpmn.createExecutableProcess("secondProcess").startEvent().endEvent().done();
-
-  private ZeebeClient zeebeClient;
   private ElasticsearchTestClient esClient;
 
-  @Before
-  public void setUp() {
-    zeebeClient = testRule.getClient();
-    esClient = createElasticsearchClient();
-  }
-
   @After
-  public void tearDown() {
-    if (zeebeClient != null) {
-      zeebeClient.close();
-      zeebeClient = null;
+  public void tearDown() throws IOException {
+    if (esClient != null) {
+      esClient.close();
+      esClient = null;
     }
   }
 
   @Test
   public void shouldExportRecords() {
-    final String orderId = "foo-bar-123";
+    // given
+    final ElasticsearchExporterConfiguration configuration = newConfiguration();
+    esClient = createElasticsearchClient(configuration);
+    exporterBrokerRule.configure("elasticsearch", ElasticsearchExporter.class, configuration);
+    exporterBrokerRule.startBroker();
 
-    // deploy workflow
-    zeebeClient
-        .newDeployCommand()
-        .addWorkflowModel(WORKFLOW, "workflow.bpmn")
-        .addWorkflowModel(SECOND_WORKFLOW, "secondWorkflow.bpmn")
-        .send()
-        .join();
+    // when
+    exporterBrokerRule.performSampleWorkload();
 
-    // start instance
-    zeebeClient
-        .newCreateInstanceCommand()
-        .bpmnProcessId("testProcess")
-        .latestVersion()
-        .payload(Collections.singletonMap("orderId", orderId))
-        .send()
-        .join();
-
-    // create job worker which fails on first try and sets retries to 0 to create an incident
-    final AtomicBoolean fail = new AtomicBoolean(true);
-
-    zeebeClient
-        .newWorker()
-        .jobType("work")
-        .handler(
-            (client, job) -> {
-              if (fail.getAndSet(false)) {
-                // fail job
-                client.newFailCommand(job.getKey()).retries(0).errorMessage("failed").send().join();
-              } else {
-                client.newCompleteCommand(job.getKey()).send().join();
-              }
-            })
-        .open();
-
-    // publish message to trigger message catch event
-    zeebeClient
-        .newPublishMessageCommand()
-        .messageName("catch")
-        .correlationKey(orderId)
-        .send()
-        .join();
-
-    // wait for incident
-    final Record<IncidentRecordValue> incident =
-        RecordingExporter.incidentRecords(IncidentIntent.CREATED).getFirst();
-    // update retries to resolve incident
-    zeebeClient.newUpdateRetriesCommand(incident.getValue().getJobKey()).retries(3).send().join();
-    zeebeClient.newResolveIncidentCommand(incident.getKey()).send().join();
-
-    // wait until workflow instance is completed
-    TestUtil.waitUntil(
-        () ->
-            workflowInstanceRecords(WorkflowInstanceIntent.ELEMENT_COMPLETED)
-                .filter(r -> r.getKey() == r.getValue().getWorkflowInstanceKey())
-                .exists());
+    // then
 
     // assert index settings for all created indices
     assertIndexSettings();
 
     // assert all records which where recorded during the tests where exported
-    assertRecordsExported();
+    exporterBrokerRule.visitExportedRecords(this::assertRecordExported);
   }
 
   private void assertIndexSettings() {
@@ -171,10 +92,6 @@ public class ElasticsearchExporterIT {
     }
   }
 
-  private void assertRecordsExported() {
-    RecordingExporter.getRecords().forEach(this::assertRecordExported);
-  }
-
   private void assertRecordExported(Record<?> record) {
     final Map<String, Object> source = esClient.get(record);
     assertThat(source)
@@ -184,34 +101,34 @@ public class ElasticsearchExporterIT {
     assertThat(source).isEqualTo(recordToMap(record));
   }
 
-  protected ElasticsearchTestClient createElasticsearchClient() {
+  protected ElasticsearchTestClient createElasticsearchClient(
+      ElasticsearchExporterConfiguration configuration) {
     return new ElasticsearchTestClient(
-        getConfiguration(), new ZbLogger("io.zeebe.exporter.elasticsearch"));
+        configuration, new ZbLogger("io.zeebe.exporter.elasticsearch"));
   }
 
-  private ElasticsearchExporterConfiguration getConfiguration() {
-    final ExporterCfg cfg = getExporterCfg();
-    if (cfg.getArgs() != null) {
-      return deserialize(cfg.getArgs(), ElasticsearchExporterConfiguration.class);
-    } else {
-      return new ElasticsearchExporterConfiguration();
-    }
-  }
+  private ElasticsearchExporterConfiguration newConfiguration() {
+    final ElasticsearchExporterConfiguration configuration =
+        new ElasticsearchExporterConfiguration();
+    configuration.bulk.delay = 1;
+    configuration.bulk.size = 1;
 
-  private ExporterCfg getExporterCfg() {
-    return testRule
-        .getBrokerCfg()
-        .getExporters()
-        .stream()
-        .filter(cfg -> cfg.getId().equals("elasticsearch"))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new AssertionError("Failed to find configuration for exporter " + "elasticsearch"));
-  }
+    configuration.index.prefix = "test-record";
+    configuration.index.createTemplate = true;
+    configuration.index.command = true;
+    configuration.index.event = true;
+    configuration.index.rejection = true;
+    configuration.index.deployment = true;
+    configuration.index.incident = true;
+    configuration.index.job = true;
+    configuration.index.jobBatch = true;
+    configuration.index.message = true;
+    configuration.index.messageSubscription = true;
+    configuration.index.raft = true;
+    configuration.index.workflowInstance = true;
+    configuration.index.workflowInstanceSubscription = true;
 
-  private <T> T deserialize(final Map<String, Object> value, final Class<T> valueClass) {
-    return MAPPER.convertValue(value, valueClass);
+    return configuration;
   }
 
   @SuppressWarnings("unchecked")
