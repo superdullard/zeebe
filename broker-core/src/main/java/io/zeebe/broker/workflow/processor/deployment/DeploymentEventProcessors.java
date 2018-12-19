@@ -18,9 +18,11 @@
 package io.zeebe.broker.workflow.processor.deployment;
 
 import static io.zeebe.protocol.intent.DeploymentIntent.CREATE;
+import static io.zeebe.protocol.intent.DeploymentIntent.CREATED;
 
 import io.zeebe.broker.logstreams.processor.TypedEventStreamProcessorBuilder;
 import io.zeebe.broker.logstreams.state.ZeebeState;
+import io.zeebe.broker.workflow.deployment.distribute.processor.DeploymentCreatedProcessor;
 import io.zeebe.broker.workflow.state.WorkflowState;
 import io.zeebe.protocol.clientapi.ValueType;
 
@@ -36,5 +38,11 @@ public class DeploymentEventProcessors {
       TypedEventStreamProcessorBuilder processorBuilder, ZeebeState zeebeState) {
     processorBuilder.onCommand(
         ValueType.DEPLOYMENT, CREATE, new TransformingDeploymentCreateProcessor(zeebeState));
+  }
+
+  public static void addDeploymentCreatedProcessor(
+      TypedEventStreamProcessorBuilder processorBuilder, WorkflowState workflowState) {
+    processorBuilder.onEvent(
+        ValueType.DEPLOYMENT, CREATED, new DeploymentCreatedProcessor(workflowState));
   }
 }

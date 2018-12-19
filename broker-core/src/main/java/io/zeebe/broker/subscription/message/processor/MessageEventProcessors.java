@@ -21,6 +21,7 @@ import io.zeebe.broker.clustering.base.topology.TopologyManager;
 import io.zeebe.broker.logstreams.processor.TypedEventStreamProcessorBuilder;
 import io.zeebe.broker.logstreams.state.ZeebeState;
 import io.zeebe.broker.subscription.command.SubscriptionCommandSender;
+import io.zeebe.broker.subscription.message.state.MessageStartEventSubscriptionState;
 import io.zeebe.broker.subscription.message.state.MessageState;
 import io.zeebe.broker.subscription.message.state.MessageSubscriptionState;
 import io.zeebe.protocol.clientapi.ValueType;
@@ -37,12 +38,18 @@ public class MessageEventProcessors {
 
     final MessageState messageState = zeebeState.getMessageState();
     final MessageSubscriptionState subscriptionState = zeebeState.getMessageSubscriptionState();
+    final MessageStartEventSubscriptionState startEventSubscriptionState =
+        zeebeState.getMessageStartEventSubscriptionState();
 
     typedProcessorBuilder
         .onCommand(
             ValueType.MESSAGE,
             MessageIntent.PUBLISH,
-            new PublishMessageProcessor(messageState, subscriptionState, subscriptionCommandSender))
+            new PublishMessageProcessor(
+                messageState,
+                subscriptionState,
+                startEventSubscriptionState,
+                subscriptionCommandSender))
         .onCommand(
             ValueType.MESSAGE, MessageIntent.DELETE, new DeleteMessageProcessor(messageState))
         .onCommand(
@@ -59,6 +66,10 @@ public class MessageEventProcessors {
             ValueType.MESSAGE_SUBSCRIPTION,
             MessageSubscriptionIntent.CLOSE,
             new CloseMessageSubscriptionProcessor(subscriptionState, subscriptionCommandSender))
+        .onCommand(
+            ValueType.MESSAGE_START_EVENT_SUBSCRIPTION,
+            MessageSubscriptionIntent.OPEN,
+            new OpenMessageStartEventSubscriptionProcessor(startEventSubscriptionState))
         .withListener(
             new MessageObserver(
                 messageState, subscriptionState, subscriptionCommandSender, topologyManager));
