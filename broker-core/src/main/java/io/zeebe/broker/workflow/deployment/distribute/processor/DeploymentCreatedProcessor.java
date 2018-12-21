@@ -49,9 +49,9 @@ public class DeploymentCreatedProcessor implements TypedRecordProcessor<Deployme
 
     // TODO: Write Distribute only on deployment partition (partition 0)
     streamWriter.appendFollowUpCommand(
-      event.getKey(), DeploymentIntent.DISTRIBUTE, deploymentEvent);
+        event.getKey(), DeploymentIntent.DISTRIBUTE, deploymentEvent);
 
-    //TODO close existing msg subscription
+    // TODO close existing msg subscription
     for (final Workflow workflowRecord : deploymentEvent.workflows()) {
       final long workflowKey = workflowRecord.getKey();
       final DeployedWorkflow workflowDefinition = workflowState.getWorkflowByKey(workflowKey);
@@ -62,16 +62,14 @@ public class DeploymentCreatedProcessor implements TypedRecordProcessor<Deployme
       for (ExecutableCatchEventElement startEvent : startEvents) {
         if (startEvent.isMessage()) {
           // start msg start subscription
-          MessageStartEventSubscriptionRecord subscriptionRecord =
+          final MessageStartEventSubscriptionRecord subscriptionRecord =
               new MessageStartEventSubscriptionRecord();
           subscriptionRecord.setMessageName(startEvent.getMessage().getMessageName());
           subscriptionRecord.setWorkflowKey(workflowKey);
           subscriptionRecord.setStartEventId(startEvent.getId());
-          streamWriter.appendNewCommand(
-              MessageSubscriptionIntent.OPEN, subscriptionRecord);
+          streamWriter.appendNewCommand(MessageSubscriptionIntent.OPEN, subscriptionRecord);
         }
       }
     }
-
   }
 }

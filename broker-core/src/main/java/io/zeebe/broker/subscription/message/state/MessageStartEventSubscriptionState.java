@@ -40,10 +40,9 @@ public class MessageStartEventSubscriptionState {
       subscriptionsColumnFamily;
 
   // (workflowKey, messageName) => \0  : to find existing subscriptions of a workflow
-  private final DbCompositeKey<DbLong, DbString>
-      workflowKeyAndMessageName;
+  private final DbCompositeKey<DbLong, DbString> workflowKeyAndMessageName;
   private final ColumnFamily<DbCompositeKey<DbLong, DbString>, DbNil>
-    subscriptionsOfWorkflowKeyColumnfamily;
+      subscriptionsOfWorkflowKeyColumnfamily;
 
   public MessageStartEventSubscriptionState(ZeebeDb<ZbColumnFamilies> zeebeDb) {
     this.zeebeDb = zeebeDb;
@@ -58,8 +57,7 @@ public class MessageStartEventSubscriptionState {
             messageNameAndWorkflowKey,
             subscriptionInfo);
 
-    workflowKeyAndMessageName =
-        new DbCompositeKey<>(workflowKey, messageName);
+    workflowKeyAndMessageName = new DbCompositeKey<>(workflowKey, messageName);
     subscriptionsOfWorkflowKeyColumnfamily =
         zeebeDb.createColumnFamily(
             ZbColumnFamilies.MESSAGE_START_EVENT_SUBSCRIPTION_BY_PROCESS_ID_NAME_AND_KEY,
@@ -73,8 +71,7 @@ public class MessageStartEventSubscriptionState {
           messageName.wrapBuffer(subscription.getMessageName());
           workflowKey.wrapLong(subscription.getWorkflowKey());
           subscriptionsColumnFamily.put(messageNameAndWorkflowKey, subscription);
-          subscriptionsOfWorkflowKeyColumnfamily.put(
-              workflowKeyAndMessageName, DbNil.INSTANCE);
+          subscriptionsOfWorkflowKeyColumnfamily.put(workflowKeyAndMessageName, DbNil.INSTANCE);
         });
   }
 

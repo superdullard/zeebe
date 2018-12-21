@@ -35,9 +35,7 @@ public class MessageStartEventSubscription implements DbValue {
   public MessageStartEventSubscription() {}
 
   public MessageStartEventSubscription(
-      DirectBuffer messageName,
-      DirectBuffer startEventId,
-      long workflowKey) {
+      DirectBuffer messageName, DirectBuffer startEventId, long workflowKey) {
     this.messageName.wrap(messageName);
     this.workflowKey = workflowKey;
     this.startEventId.wrap(startEventId);

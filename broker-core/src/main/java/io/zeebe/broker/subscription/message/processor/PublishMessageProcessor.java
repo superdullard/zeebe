@@ -172,17 +172,17 @@ public class PublishMessageProcessor implements TypedRecordProcessor<MessageReco
 
   private void correlateMessageStartEvents(
       final TypedRecord<MessageRecord> command, final TypedStreamWriter streamWriter) {
-    DirectBuffer messageName = command.getValue().getName();
+    final DirectBuffer messageName = command.getValue().getName();
     startEventSubscriptionState.visitSubscriptionsByMessageName(
         messageName,
         subscription -> {
-          DirectBuffer startEventId = subscription.getStartEventId();
-          long workflowKey = subscription.getWorkflowKey();
-          //DirectBuffer processId = subscription.getProcessId();
+          final DirectBuffer startEventId = subscription.getStartEventId();
+          final long workflowKey = subscription.getWorkflowKey();
+          // DirectBuffer processId = subscription.getProcessId();
 
-          WorkflowInstanceRecord record = new WorkflowInstanceRecord();
+          final WorkflowInstanceRecord record = new WorkflowInstanceRecord();
           record
-            //  .setBpmnProcessId(processId)
+              //  .setBpmnProcessId(processId)
               .setWorkflowKey(workflowKey)
               .setElementId(startEventId)
               .setPayload(command.getValue().getPayload());

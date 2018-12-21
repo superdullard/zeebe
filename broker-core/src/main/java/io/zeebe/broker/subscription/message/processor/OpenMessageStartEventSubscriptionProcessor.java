@@ -53,9 +53,7 @@ public class OpenMessageStartEventSubscriptionProcessor
     final long workflowKey = subscriptionRecord.getWorkflowKey();
     final MessageStartEventSubscription subscription =
         new MessageStartEventSubscription(
-            messageName,
-            subscriptionRecord.getStartEventId(),
-            workflowKey);
+            messageName, subscriptionRecord.getStartEventId(), workflowKey);
 
     // Check if there exists a subscription for the same message and same workflowKey
     if (!subscriptionState.exists(subscription)) {
