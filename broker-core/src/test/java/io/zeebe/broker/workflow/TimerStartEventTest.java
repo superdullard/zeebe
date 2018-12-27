@@ -28,6 +28,7 @@ import io.zeebe.exporter.record.value.TimerRecordValue;
 import io.zeebe.exporter.record.value.WorkflowInstanceRecordValue;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
+import io.zeebe.model.bpmn.builder.ProcessBuilder;
 import io.zeebe.protocol.intent.DeploymentIntent;
 import io.zeebe.protocol.intent.TimerIntent;
 import io.zeebe.protocol.intent.WorkflowInstanceIntent;
@@ -37,6 +38,7 @@ import io.zeebe.test.broker.protocol.clientapi.PartitionTestClient;
 import io.zeebe.test.util.record.RecordingExporter;
 import java.time.Duration;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
@@ -64,6 +66,10 @@ public class TimerStartEventTest {
           .endEvent("end_3")
           .done();
 
+  public static BpmnModelInstance multiStartModel;
+
+  public static BpmnModelInstance multiStartSameEndModel;
+
   public EmbeddedBrokerRule brokerRule = new EmbeddedBrokerRule();
 
   public ClientApiRule apiRule = new ClientApiRule(brokerRule::getClientAddress);
@@ -71,6 +77,20 @@ public class TimerStartEventTest {
   @Rule public RuleChain ruleChain = RuleChain.outerRule(brokerRule).around(apiRule);
 
   private PartitionTestClient testClient;
+
+  @BeforeClass
+  public static void createModels() {
+    ProcessBuilder builder = Bpmn.createExecutableProcess("process_4");
+    builder.startEvent("start_4").timerWithCycle("R/PT2S").endEvent("end_4");
+    multiStartModel =
+        builder.startEvent("start_5").timerWithCycle("R/PT3S").endEvent("end_5").done();
+
+    builder = Bpmn.createExecutableProcess("process_5");
+
+    builder.startEvent("start_4").timerWithCycle("R/PT2S").endEvent("end_4");
+    multiStartSameEndModel =
+        builder.startEvent("start_5").timerWithCycle("R/PT2S").connectTo("end_4").done();
+  }
 
   @Before
   public void setUp() {
@@ -279,7 +299,6 @@ public class TimerStartEventTest {
   @Test
   public void shouldTriggerDifferentWorkflowsSeparately() {
     // when
-    brokerRule.getClock().pinCurrentTime();
     testClient.deploy(THREE_SEC_MODEL);
     testClient.deploy(REPEATING_MODEL);
 
@@ -310,5 +329,112 @@ public class TimerStartEventTest {
                 .withElementId("process_3")
                 .exists())
         .isTrue();
+  }
+
+  @Test
+  public void shouldCreateMultipleTimersInSameModel() {
+    // when
+    testClient.deploy(multiStartModel);
+
+    // then
+    assertThat(RecordingExporter.timerRecords(TimerIntent.CREATED).limit(2).count()).isEqualTo(2);
+    brokerRule.getClock().addTime(Duration.ofSeconds(3));
+    assertThat(RecordingExporter.timerRecords(TimerIntent.TRIGGERED).limit(2).count()).isEqualTo(2);
+  }
+
+  @Test
+  public void shouldRunMultipleBranchesInWorkflowSimultaneously() {
+    // when
+    testClient.deploy(multiStartModel);
+    assertThat(RecordingExporter.timerRecords(TimerIntent.CREATED).limit(2).count()).isEqualTo(2);
+    brokerRule.getClock().addTime(Duration.ofSeconds(3));
+
+    // then
+    assertThat(RecordingExporter.timerRecords(TimerIntent.TRIGGERED).limit(2).count()).isEqualTo(2);
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_4")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_5")
+                .exists())
+        .isTrue();
+
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(EVENT_ACTIVATED)
+                .withElementId("end_4")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(EVENT_ACTIVATED)
+                .withElementId("end_5")
+                .exists())
+        .isTrue();
+  }
+
+  @Test
+  public void shouldCreateMultipleInstanceAtTheCorrectTimes() {
+    // when
+    testClient.deploy(multiStartModel);
+    assertThat(RecordingExporter.timerRecords(TimerIntent.CREATED).limit(2).count()).isEqualTo(2);
+    brokerRule.getClock().addTime(Duration.ofSeconds(2));
+
+    // then
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_4")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(EVENT_ACTIVATED)
+                .withElementId("end_4")
+                .exists())
+        .isTrue();
+
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_5")
+                .exists())
+        .isFalse();
+
+    brokerRule.getClock().addTime(Duration.ofSeconds(1));
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_5")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(EVENT_ACTIVATED)
+                .withElementId("end_5")
+                .exists())
+        .isTrue();
+  }
+
+  @Test
+  public void shouldCompleteMultipleSimultaneousInstancesWithSameEndEvent() {
+    // when
+    testClient.deploy(multiStartSameEndModel);
+    assertThat(RecordingExporter.timerRecords(TimerIntent.CREATED).limit(2).count()).isEqualTo(2);
+    brokerRule.getClock().addTime(Duration.ofSeconds(2));
+
+    // then
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_4")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(WorkflowInstanceIntent.EVENT_TRIGGERED)
+                .withElementId("start_5")
+                .exists())
+        .isTrue();
+    assertThat(
+            RecordingExporter.workflowInstanceRecords(EVENT_ACTIVATED)
+                .withElementId("end_4")
+                .limit(2)
+                .count())
+        .isEqualTo(2);
   }
 }
